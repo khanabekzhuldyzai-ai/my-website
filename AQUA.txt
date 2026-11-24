@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="kk" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AQUA KZ – Қазақстанның су мониторингі платформасы</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS for Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- Chart.js for Statistics & Calculator Charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              900: '#0A2540',
+              800: '#0F3E68',
+              600: '#0284C7',
+              500: '#38BDF8',
+              400: '#7DD3FC',
+              50: '#F4F8FB'
+            }
+          },
+          boxShadow: {
+            'soft': '0 10px 30px -5px rgba(10, 37, 64, 0.05)',
+            'card': '0 20px 40px -15px rgba(10, 37, 64, 0.08)'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* IQAir Map Style Customizations & Fixes */
+    .leaflet-container {
+      width: 100%;
+      height: 100%;
+      background: #F4F8FB;
+      font-family: 'Inter', sans-serif;
+      z-index: 10;
+    }
+    .iqair-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      color: white;
+      font-weight: 700;
+      font-size: 11px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      border: 2px solid #ffffff;
+      transition: transform 0.2s ease;
+    }
+    .iqair-marker:hover {
+      transform: scale(1.15);
+    }
+    .iqair-marker-active {
+      transform: scale(1.2);
+      box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.4), 0 6px 16px rgba(0,0,0,0.3);
+    }
+    .city-map-label {
+      background: rgba(10, 37, 64, 0.85);
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      white-space: nowrap;
+    }
+    .city-map-label::before { display: none; }
+    .hydro-station-marker {
+      background: #0E7490;
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      border: 1px solid #ffffff;
+      white-space: nowrap;
+      text-align: center;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F4F8FB;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94A3B8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-sky-500 selection:text-white">
+
+  <!-- LOADING ANIMATION SCREEN -->
+  <div id="app-loader" class="fixed inset-0 z-[9999] bg-[#0A2540] flex flex-col items-center justify-center text-white transition-opacity duration-500">
+    <div class="relative w-20 h-20 mb-6">
+      <div class="absolute inset-0 rounded-full border-4 border-sky-500/20 animate-pulse"></div>
+      <div class="absolute inset-0 rounded-full border-4 border-t-sky-400 border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+      <div class="absolute inset-0 flex items-center justify-center">
+        <svg class="w-8 h-8 text-sky-400 fill-current" viewBox="0 0 24 24">
+          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+        </svg>
+      </div>
+    </div>
+    <h2 class="font-display font-bold text-2xl tracking-wide mb-1">AQUA <span class="text-sky-400">KZ</span></h2>
+    <p class="text-xs text-slate-400 uppercase tracking-widest">Қазақстанның су мониторингі платформасы</p>
+  </div>
+
+  <!-- NAVIGATION -->
+  <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      
+      <!-- Logo -->
+      <a href="#" class="flex items-center gap-3 group">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#0284C7] to-[#10B981] p-2 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
+          <svg viewBox="0 0 40 40" class="w-full h-full" fill="none">
+            <path d="M20 3C20 3 8 16.2 8 24.5C8 31.1274 13.3726 36.5 20 36.5C26.6274 36.5 32 31.1274 32 24.5C32 16.2 20 3 20 3Z" fill="#38BDF8" stroke="white" stroke-width="1.5"/>
+            <path d="M11.5 23.5L13.8 21.8L16.5 22.3L19.5 20.5L23.2 20.8L26.5 22.2L28.5 24.2L26.8 26.5L23.5 27.2L20.8 28.5L17.5 27.6L14.2 28.2L11.8 26.2L11.5 23.5Z" fill="#FFFFFF"/>
+          </svg>
+        </div>
+        <div>
+          <span class="font-display font-extrabold text-xl text-[#0A2540] tracking-tight">AQUA <span class="text-[#0284C7]">KZ</span></span>
+          <span class="block text-[10px] text-slate-400 uppercase tracking-widest font-semibold">SDG 6 Monitor</span>
+        </div>
+      </a>
+
+      <!-- Desktop Nav -->
+      <nav class="hidden lg:flex items-center gap-1 font-medium text-sm text-slate-600">
+        <a href="#hero" class="px-3.5 py-2 rounded-xl hover:text-[#0284C7] hover:bg-sky-50 transition-colors">Басты бет</a>
+        <a href="#map-section" class="px-3.5 py-2 rounded-xl hover:text-[#0284C7] hover:bg-sky-50 transition-colors">Қазақстан картасы</a>
+        <a href="#statistics" class="px-3.5 py-2 rounded-xl hover:text-[#0284C7] hover:bg-sky-50 transition-colors">Су статистикасы</a>
+        <a href="#calculator" class="px-3.5 py-2 rounded-xl hover:text-[#0284C7] hover:bg-sky-50 transition-colors">Су калькуляторы</a>
+        <a href="#saving" class="px-3.5 py-2 rounded-xl hover:text-[#0284C7] hover:bg-sky-50 transition-colors">Су үнемдеу</a>
+        <a href="#news" class="px-3.5 py-2 rounded-xl hover:text-[#0284C7] hover:bg-sky-50 transition-colors">Жаңалықтар</a>
+        <a href="#about-project" class="px-3.5 py-2 rounded-xl hover:text-[#0284C7] hover:bg-sky-50 transition-colors">Жоба туралы</a>
+        <a href="#sources" class="px-3.5 py-2 rounded-xl hover:text-[#0284C7] hover:bg-sky-50 transition-colors">Дереккөздер</a>
+      </nav>
+
+      <!-- Right Action / Search -->
+      <div class="hidden sm:flex items-center gap-3">
+        <button onclick="openSearchModal()" class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold transition-colors">
+          <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+          <span>Іздеу... (Ctrl+K)</span>
+        </button>
+        <a href="#calculator" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#0284C7] to-[#10B981] text-white font-semibold text-xs shadow-md hover:opacity-95 transition-all">
+          Калькулятор
+        </a>
+      </div>
+
+      <!-- Mobile Menu Button -->
+      <button onclick="toggleMobileMenu()" class="lg:hidden p-2.5 rounded-xl bg-slate-100 text-slate-700">
+        <i data-lucide="menu" class="w-6 h-6"></i>
+      </button>
+    </div>
+
+    <!-- Mobile Menu Dropdown -->
+    <div id="mobile-menu" class="lg:hidden hidden bg-white border-b border-slate-200 px-4 pt-2 pb-6 space-y-2 text-sm font-medium">
+      <a href="#hero" onclick="toggleMobileMenu()" class="block px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700">Басты бет</a>
+      <a href="#map-section" onclick="toggleMobileMenu()" class="block px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700">Қазақстан картасы</a>
+      <a href="#statistics" onclick="toggleMobileMenu()" class="block px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700">Су статистикасы</a>
+      <a href="#calculator" onclick="toggleMobileMenu()" class="block px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700">Су калькуляторы</a>
+      <a href="#saving" onclick="toggleMobileMenu()" class="block px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700">Су үнемдеу</a>
+      <a href="#news" onclick="toggleMobileMenu()" class="block px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700">Жаңалықтар</a>
+      <a href="#about-project" onclick="toggleMobileMenu()" class="block px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700">Жоба туралы</a>
+      <a href="#project-author" onclick="toggleMobileMenu()" class="block px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700">Жоба авторы</a>
+      <a href="#sources" onclick="toggleMobileMenu()" class="block px-3 py-2 rounded-lg hover:bg-sky-50 text-slate-700">Дереккөздер</a>
+    </div>
+  </header>
+
+  <!-- HERO SECTION -->
+  <section id="hero" class="relative overflow-hidden bg-gradient-to-b from-[#0A2540] via-[#0F3E68] to-[#0A2540] text-white py-20 lg:py-28">
+    <!-- Decorative background glow -->
+    <div class="absolute inset-0 opacity-15 pointer-events-none">
+      <div class="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-sky-400 blur-3xl"></div>
+      <div class="absolute top-1/2 -right-40 w-96 h-96 rounded-full bg-emerald-400 blur-3xl"></div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div class="max-w-3xl mx-auto text-center space-y-6">
+        
+        <!-- SDG 6 Badge -->
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-sky-300 text-xs font-semibold">
+          <i data-lucide="droplets" class="w-4 h-4"></i>
+          <span>БҰҰ Тұрақты даму мақсаты 6: Таза су және санитария</span>
+        </div>
+
+        <!-- Main Title -->
+        <h1 class="font-display font-extrabold text-3xl sm:text-5xl lg:text-6xl tracking-tight leading-[1.15] text-white break-words">
+          Таза су – болашақтың <span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-300 to-emerald-300">кепілі</span>
+        </h1>
+
+        <!-- Subtitle -->
+        <p class="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed font-normal">
+          Қазақстандағы су ресурстарының жағдайын зерттеңіз, нақты статистиканы көріңіз және өзіңіздің күнделікті су тұтынуыңызды есептеңіз. Суды бірге қорғайық!
+        </p>
+
+        <!-- CTA Buttons -->
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+          <a href="#map-section" class="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-gradient-to-r from-[#0284C7] to-[#10B981] text-white font-bold text-sm shadow-lg hover:shadow-sky-500/25 hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
+            <i data-lucide="map" class="w-4 h-4"></i>
+            <span>Қазақстан картасын көру</span>
+          </a>
+          <a href="#calculator" class="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-sm backdrop-blur-md transition-all flex items-center justify-center gap-2">
+            <i data-lucide="calculator" class="w-4 h-4 text-sky-400"></i>
+            <span>Су тұтынуды есептеу</span>
+          </a>
+        </div>
+
+        <!-- Motto banner -->
+        <div class="pt-6 text-xs text-sky-200/80 font-medium tracking-wide">
+          «Әр тамшы маңызды. Әр көрсеткіш маңызды!»
+        </div>
+
+      </div>
+
+      <!-- Hero Statistics Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-16">
+        
+        <div class="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-5 hover:bg-white/15 transition-all">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs text-sky-300 font-semibold uppercase">Жерүсті сулары</span>
+            <i data-lucide="waves" class="w-5 h-5 text-sky-400"></i>
+          </div>
+          <div class="font-display font-extrabold text-2xl text-white">~100 км³</div>
+          <p class="text-xs text-slate-300 mt-1">Қазақстанның орташа жылдық қолжетімді су ресурстары</p>
+          <div class="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Дереккөз: ҚР СРИМ</span>
+            <span>2024 ж.</span>
+          </div>
+        </div>
+
+        <div class="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-5 hover:bg-white/15 transition-all">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs text-emerald-300 font-semibold uppercase">Су тұтыну құрылымы</span>
+            <i data-lucide="pie-chart" class="w-5 h-5 text-emerald-400"></i>
+          </div>
+          <div class="font-display font-extrabold text-2xl text-white">65% А.Ш.</div>
+          <p class="text-xs text-slate-300 mt-1">Жалпы су алудың ең үлкен үлесі ауыл шаруашылығына тиесілі</p>
+          <div class="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Дереккөз: ҰСБ бюросы</span>
+            <span>2023 ж.</span>
+          </div>
+        </div>
+
+        <div class="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-5 hover:bg-white/15 transition-all">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs text-amber-300 font-semibold uppercase">Трансшекаралық үлес</span>
+            <i data-lucide="globe-2" class="w-5 h-5 text-amber-400"></i>
+          </div>
+          <div class="font-display font-extrabold text-2xl text-white">~45–50%</div>
+          <p class="text-xs text-slate-300 mt-1">Көрші елдерден келетін су ағынының сыртқы тәуелділігі</p>
+          <div class="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Дереккөз: CAWater-Info</span>
+            <span>2024 ж.</span>
+          </div>
+        </div>
+
+        <div class="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-5 hover:bg-white/15 transition-all">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs text-sky-300 font-semibold uppercase">Ауыз сумен қамту</span>
+            <i data-lucide="check-circle-2" class="w-5 h-5 text-sky-400"></i>
+          </div>
+          <div class="font-display font-extrabold text-2xl text-white">96.8%</div>
+          <p class="text-xs text-slate-300 mt-1">Қалалар мен елді мекендердің орталықтандырылған ауыз су қолжетімділігі</p>
+          <div class="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Дереккөз: ҚР СРИМ</span>
+            <span>2024 ж.</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- KAZAKHSTAN INTERACTIVE MAP SECTION (IQAir Style) -->
+  <section id="map-section" class="py-16 lg:py-24 bg-slate-100">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <!-- Section Header -->
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-[#0284C7] bg-sky-100 px-3 py-1 rounded-full">Интерактивті мониторинг</span>
+          <h2 class="font-display font-extrabold text-2xl sm:text-3xl text-[#0A2540] mt-2">Қазақстанның су ресурстары картасы</h2>
+          <p class="text-sm text-slate-600 mt-1">IQAir стиліндегі өңірлік су сапасы, тапшылығы және гидромониторинг жүйесі</p>
+        </div>
+
+        <!-- Quick City Selector Dropdown -->
+        <div class="flex items-center gap-2">
+          <select id="city-quick-select" onchange="selectCityFromDropdown(this.value)" class="bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#0284C7]">
+            <option value="">Қаланы таңдаңыз (20 қала)...</option>
+          </select>
+          <button onclick="resetKazakhstanMapView()" class="px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+            <span>Қалпына келтіру</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- MAP LAYERS SELECTOR BUTTONS -->
+      <div class="flex flex-wrap items-center gap-2 mb-4 bg-white p-2 rounded-2xl border border-slate-200/80 shadow-xs">
+        <span class="text-xs font-bold text-slate-500 px-3">Қабаттар:</span>
+        <button onclick="switchMapLayer('stress')" data-layer="stress" class="layer-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all bg-[#0A2540] text-white shadow-sm">
+          💧 Су тапшылығы (Stress)
+        </button>
+        <button onclick="switchMapLayer('quality')" data-layer="quality" class="layer-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">
+          🧪 Су сапасы (Quality)
+        </button>
+        <button onclick="switchMapLayer('consumption')" data-layer="consumption" class="layer-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">
+          🏠 Су тұтыну (Consumption)
+        </button>
+        <button onclick="switchMapLayer('availability')" data-layer="availability" class="layer-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">
+          🌊 Қолжетімділік (Availability)
+        </button>
+        <button onclick="switchMapLayer('hydrology')" data-layer="hydrology" class="layer-btn px-3 py-2 rounded-xl text-xs font-semibold transition-all bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">
+          📈 Гидромониторинг
+        </button>
+      </div>
+
+      <!-- MAP & SIDE PANEL CONTAINER -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Leaflet Map Canvas (8 cols) -->
+        <div class="lg:col-span-8 bg-white rounded-3xl p-3 shadow-soft border border-slate-200/80 relative">
+          <div id="kz-map" class="w-[100%] h-[520px] sm:h-[580px] rounded-2xl z-10"></div>
+          
+          <!-- Map Legend Overlay -->
+          <div id="map-legend" class="absolute bottom-6 left-6 z-[400] bg-white/95 backdrop-blur-md p-3.5 rounded-xl border border-slate-200 shadow-lg text-xs max-w-xs">
+            <!-- Dynamically injected legend -->
+          </div>
+
+          <!-- Zoom Info Hint -->
+          <div class="absolute top-6 left-6 z-[400] bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 shadow-sm flex items-center gap-1.5">
+            <i data-lucide="info" class="w-3.5 h-3.5 text-[#0284C7]"></i>
+            <span id="zoom-status-text">Гидробекеттер үшін картаны үлкейтіңіз (Zoom ≥ 6)</span>
+          </div>
+        </div>
+
+        <!-- City Info Side Panel (4 cols) -->
+        <div class="lg:col-span-4 bg-white rounded-3xl p-6 shadow-soft border border-slate-200/80 space-y-5">
+          
+          <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+              <span class="text-[11px] font-bold uppercase tracking-wider text-[#0284C7]">Қалалық мониторинг</span>
+              <h3 id="panel-city-name" class="font-display font-extrabold text-xl text-[#0A2540] mt-0.5">Алматы қаласы</h3>
+            </div>
+            <div id="panel-badge" class="px-3 py-1 rounded-full text-xs font-bold text-white bg-sky-500">
+              Жақсы
+            </div>
+          </div>
+
+          <!-- Dynamic Panel Content -->
+          <div id="panel-content" class="space-y-4 text-sm text-slate-600">
+            <!-- Populated via JavaScript on city click -->
+          </div>
+
+          <div class="pt-2 text-[11px] text-slate-400 bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-center justify-between">
+            <span>Ресми дереккөз: Қазгидромет</span>
+            <span class="font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">DEMO РЕЖИМ</span>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- KAZAKHSTAN WATER STATISTICS SECTION -->
+  <section id="statistics" class="py-16 lg:py-24 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="max-w-2xl mx-auto text-center mb-16">
+        <span class="text-xs font-bold uppercase tracking-wider text-[#0284C7] bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100">Ресми статистика (2020–2024)</span>
+        <h2 class="font-display font-extrabold text-2xl sm:text-4xl text-[#0A2540] mt-3">Қазақстандағы су жағдайы</h2>
+        <p class="text-sm text-slate-600 mt-2">ҚР Ұлттық статистика бюросы, Қазгидромет және Су ресурстары министрлігінің тексерілген деректері</p>
+      </div>
+
+      <!-- Statistics Grid & Charts -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center mb-16">
+        
+        <!-- Chart 1: Water Withdrawal Bar Chart -->
+        <div class="bg-slate-50 rounded-3xl p-6 border border-slate-200/80 shadow-xs">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display font-bold text-base text-[#0A2540]">Жылдық су алу көлемі динамикасы (км³)</h3>
+              <p class="text-xs text-slate-500">2020–2023 жылдар аралығындағы салыстырмалы көрсеткіштер</p>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-sky-100 text-[#0284C7]">ҰСБ мәліметі</span>
+          </div>
+          <div class="h-72 relative">
+            <canvas id="withdrawalChart"></canvas>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-200/70 flex items-center justify-between text-xs text-slate-500">
+            <span>Өлшем бірлігі: текше километр (км³)</span>
+            <a href="https://stat.gov.kz/" target="_blank" rel="noopener" class="text-[#0284C7] font-semibold hover:underline flex items-center gap-1">
+              stat.gov.kz <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- Chart 2: Sectoral Usage Doughnut -->
+        <div class="bg-slate-50 rounded-3xl p-6 border border-slate-200/80 shadow-xs">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="font-display font-bold text-base text-[#0A2540]">Салалар бойынша су пайдалану үлесі</h3>
+              <p class="text-xs text-slate-500">Ауыл шаруашылығы, өнеркәсіп және коммуналдық сектор</p>
+            </div>
+            <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700">SRIM 2024</span>
+          </div>
+          <div class="h-72 relative flex items-center justify-center">
+            <canvas id="sectorChart"></canvas>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-200/70 flex items-center justify-between text-xs text-slate-500">
+            <span>Негізгі тұтынушы: Ауыл шаруашылығы (~65%)</span>
+            <a href="https://www.gov.kz/memleket/entities/water?lang=kk" target="_blank" rel="noopener" class="text-[#0284C7] font-semibold hover:underline flex items-center gap-1">
+              SRIM порталы <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Critical Environmental Areas Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <div class="bg-[#F4F8FB] rounded-2xl p-6 border border-slate-200/80">
+          <div class="w-10 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center mb-4 font-bold">01</div>
+          <h3 class="font-display font-bold text-lg text-[#0A2540] mb-2">Арал теңізінің мәселесі</h3>
+          <p class="text-xs text-slate-600 leading-relaxed mb-4">
+            Солтүстік Аралды сақтау және қалпына келтіру жұмыстары жүргізілуде. Сырдария өзені арқылы келетін су көлемі мен Көкарал бөгетінің жұмысы ерекше бақылауда.
+          </p>
+          <div class="pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+            <span class="text-slate-500">Дереккөз: CAWater-Info</span>
+            <a href="https://www.cawater-info.net/" target="_blank" rel="noopener" class="text-[#0284C7] font-semibold hover:underline">Толығырақ →</a>
+          </div>
+        </div>
+
+        <div class="bg-[#F4F8FB] rounded-2xl p-6 border border-slate-200/80">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center mb-4 font-bold">02</div>
+          <h3 class="font-display font-bold text-lg text-[#0A2540] mb-2">Балқаш көлінің экожүйесі</h3>
+          <p class="text-xs text-slate-600 leading-relaxed mb-4">
+            Балқаш көлінің деңгейін тұрақты ұстап тұру үшін Іле өзенінің ағысы мен Қапшағай су қоймасының жұмыс режимі басты экологиялық міндет болып табылады.
+          </p>
+          <div class="pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+            <span class="text-slate-500">Дереккөз: Қазгидромет</span>
+            <a href="https://www.kazhydromet.kz/" target="_blank" rel="noopener" class="text-[#0284C7] font-semibold hover:underline">Толығырақ →</a>
+          </div>
+        </div>
+
+        <div class="bg-[#F4F8FB] rounded-2xl p-6 border border-slate-200/80">
+          <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center mb-4 font-bold">03</div>
+          <h3 class="font-display font-bold text-lg text-[#0A2540] mb-2">Трансшекаралық өзендер</h3>
+          <p class="text-xs text-slate-600 leading-relaxed mb-4">
+            Ертіс, Жайық, Шу, Талас және Сырдария өзендерінің су ресурстарын бірлесіп пайдалану бойынша көршілес мемлекеттермен келіссөздер жүргізілуде.
+          </p>
+          <div class="pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+            <span class="text-slate-500">Дереккөз: UN-Water</span>
+            <a href="https://www.unwater.org/" target="_blank" rel="noopener" class="text-[#0284C7] font-semibold hover:underline">Толығырақ →</a>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- WATER CONSUMPTION CALCULATOR SECTION -->
+  <section id="calculator" class="py-16 lg:py-24 bg-slate-100">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="max-w-2xl mx-auto text-center mb-16">
+        <span class="text-xs font-bold uppercase tracking-wider text-[#0284C7] bg-sky-100 px-3.5 py-1 rounded-full">Интерактивті құрал</span>
+        <h2 class="font-display font-extrabold text-2xl sm:text-4xl text-[#0A2540] mt-3">Су тұтыну калькуляторы</h2>
+        <p class="text-sm text-slate-600 mt-2">Күнделікті әдеттеріңізді енгізіп, қанша литр су жұмсайтыныңызды бірден есептеңіз</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        <!-- Calculator Form (7 cols) -->
+        <div class="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-8 shadow-soft border border-slate-200/80 space-y-8">
+          
+          <!-- Category 1: Hygiene -->
+          <div>
+            <h3 class="font-display font-bold text-base text-[#0A2540] flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+              <i data-lucide="shower-head" class="w-5 h-5 text-[#0284C7]"></i>
+              1. Жуыну және жеке гигиена
+            </h3>
+            
+            <div class="space-y-4 text-xs sm:text-sm">
+              <div>
+                <label class="block font-medium text-slate-700 mb-1">Күніне душта қанша минут боласыз? (<span id="val-shower-min">7</span> мин)</label>
+                <input type="range" id="in-shower-min" min="1" max="30" value="7" oninput="calculateWater()" class="w-full accent-[#0284C7] cursor-pointer">
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block font-medium text-slate-700 mb-1">Душтың су ағу жылдамдығы</label>
+                  <select id="coef-shower-flow" onchange="calculateWater()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-700">
+                    <option value="7">Экономиялық (7 л/мин)</option>
+                    <option value="9" selected>Орташа (9 л/мин)</option>
+                    <option value="15">Күшті ағын (15 л/мин)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block font-medium text-slate-700 mb-1">Ванна қабылдау (аптасына рет)</label>
+                  <input type="number" id="in-bath-week" min="0" max="7" value="0" oninput="calculateWater()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-700">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block font-medium text-slate-700 mb-1">Күніне неше рет қол жуасыз?</label>
+                  <input type="number" id="in-handwash" min="1" max="20" value="6" oninput="calculateWater()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-700">
+                </div>
+                <div class="flex items-center pt-5">
+                  <label class="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" id="in-teeth-open" onchange="calculateWater()" class="w-4 h-4 rounded accent-[#0284C7]">
+                    <span class="text-xs font-medium text-slate-700">Тіс тазалағанда кранды ашық қалдырасыз ба?</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Category 2: Kitchen -->
+          <div>
+            <h3 class="font-display font-bold text-base text-[#0A2540] flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+              <i data-lucide="utensils" class="w-5 h-5 text-emerald-600"></i>
+              2. Ас үй және ыдыс жуу
+            </h3>
+            
+            <div class="space-y-4 text-xs sm:text-sm">
+              <div>
+                <label class="block font-medium text-slate-700 mb-1.5">Ыдыс қалай жуылады?</label>
+                <div class="flex gap-4">
+                  <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                    <input type="radio" name="dish-method" value="hand" checked onchange="toggleDishMethod()" class="accent-[#0284C7]"> Қолмен жуу
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                    <input type="radio" name="dish-method" value="machine" onchange="toggleDishMethod()" class="accent-[#0284C7]"> Ыдыс жуғыш машина
+                  </label>
+                </div>
+              </div>
+
+              <div id="dish-hand-box">
+                <label class="block font-medium text-slate-700 mb-1">Ыдыс жууға кететін уақыт (<span id="val-dish-min">5</span> мин/күн)</label>
+                <input type="range" id="in-dish-min" min="1" max="30" value="5" oninput="calculateWater()" class="w-full accent-emerald-600 cursor-pointer">
+              </div>
+
+              <div id="dish-machine-box" class="hidden">
+                <label class="block font-medium text-slate-700 mb-1">Ыдыс жуғыш машина (аптасына неше рет?)</label>
+                <input type="number" id="in-dishwasher-week" min="0" max="14" value="3" oninput="calculateWater()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-700">
+              </div>
+
+              <div>
+                <label class="block font-medium text-slate-700 mb-1">Көкөністер мен жемістерді жуу (<span id="val-veg-liters">8</span> л/күн)</label>
+                <input type="range" id="in-veg-liters" min="2" max="30" value="8" oninput="calculateWater()" class="w-full accent-emerald-600 cursor-pointer">
+              </div>
+            </div>
+          </div>
+
+          <!-- Category 3: Household -->
+          <div>
+            <h3 class="font-display font-bold text-base text-[#0A2540] flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+              <i data-lucide="home" class="w-5 h-5 text-indigo-600"></i>
+              3. Тұрмыстық қажеттіліктер
+            </h3>
+            
+            <div class="space-y-4 text-xs sm:text-sm">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block font-medium text-slate-700 mb-1">Кір жуу (аптасына рет)</label>
+                  <input type="number" id="in-laundry-week" min="0" max="14" value="3" oninput="calculateWater()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-700">
+                </div>
+                <div>
+                  <label class="block font-medium text-slate-700 mb-1">Бір циклдегі су көлемі</label>
+                  <select id="coef-laundry-liters" onchange="calculateWater()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-700">
+                    <option value="40">Эко машина (40 л)</option>
+                    <option value="50" selected>Стандарт (50 л)</option>
+                    <option value="70">Ескі үлгі (70 л)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block font-medium text-slate-700 mb-1">Дәретхана бачогын қолдану (рет/күн)</label>
+                  <input type="number" id="in-toilet-day" min="1" max="25" value="5" oninput="calculateWater()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-700">
+                </div>
+                <div>
+                  <label class="block font-medium text-slate-700 mb-1">Бачок көлемі</label>
+                  <select id="coef-toilet-liters" onchange="calculateWater()" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-700">
+                    <option value="4">Үнемді (4 л)</option>
+                    <option value="6" selected>Стандарт (6 л)</option>
+                    <option value="9">Ескі үлгі (9 л)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block font-medium text-slate-700 mb-1">Үй жинау және басқа қажеттіліктер (<span id="val-cleaning-liters">10</span> л/күн)</label>
+                <input type="range" id="in-cleaning-liters" min="2" max="50" value="10" oninput="calculateWater()" class="w-full accent-indigo-600 cursor-pointer">
+              </div>
+            </div>
+          </div>
+
+          <button onclick="resetCalculator()" class="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors">
+            Калькуляторды тазарту / Басынан бастау
+          </button>
+
+        </div>
+
+        <!-- Calculator Results & Insights (5 cols) -->
+        <div class="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-8 shadow-soft border border-slate-200/80 sticky top-28 space-y-6">
+          
+          <h3 class="font-display font-extrabold text-lg text-[#0A2540]">Сіздің есептеу нәтижелеріңіз</h3>
+
+          <!-- Result Tier Notification Box -->
+          <div id="res-tier-box" class="p-4 rounded-xl border border-sky-200 bg-sky-50 text-sky-900 transition-all">
+            <h4 id="res-tier-title" class="font-display font-bold text-sm mb-1">💧 «Су тұтынуыңыз орташа деңгейде»</h4>
+            <p id="res-tier-desc" class="text-xs leading-relaxed">Көрсеткішіңіз Қазақстан қалаларының орташа мәніне сай келеді.</p>
+          </div>
+
+          <!-- Big Daily Number -->
+          <div class="bg-gradient-to-br from-[#0A2540] to-[#0F3E68] text-white rounded-2xl p-6 text-center shadow-md">
+            <span class="text-xs text-sky-300 uppercase tracking-widest font-semibold block mb-1">Тәуліктік су тұтынуыңыз</span>
+            <div class="font-display font-extrabold text-4xl sm:text-5xl text-white my-2">
+              <span id="res-daily">145</span> <span class="text-xl font-normal text-sky-300">литр/күн</span>
+            </div>
+            <p class="text-xs text-slate-300">Аптасына: <strong id="res-weekly" class="text-white">1 015 л</strong> | Айлық: <strong id="res-monthly" class="text-white">4 350 л (4.35 м³)</strong></p>
+          </div>
+
+          <!-- Category Breakdown Table -->
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between p-2.5 rounded-lg bg-slate-50">
+              <span class="text-slate-600">Жеке гигиена (Душ, ванна, қол):</span>
+              <strong id="cat-hygiene-total" class="text-[#0A2540]">95 л/күн</strong>
+            </div>
+            <div class="flex justify-between p-2.5 rounded-lg bg-slate-50">
+              <span class="text-slate-600">Ас үй (Ыдыс, жеміс):</span>
+              <strong id="cat-kitchen-total" class="text-[#0A2540]">30 л/күн</strong>
+            </div>
+            <div class="flex justify-between p-2.5 rounded-lg bg-slate-50">
+              <span class="text-slate-600">Тұрмыстық (Кір, туалет, үй):</span>
+              <strong id="cat-house-total" class="text-[#0A2540]">20 л/күн</strong>
+            </div>
+            <div class="flex justify-between p-2.5 rounded-lg bg-sky-50 border border-sky-100">
+              <span class="text-sky-900 font-semibold">Ең көп су жұмсалатын әрекет:</span>
+              <strong id="res-top-activity" class="text-[#0284C7]">Душ (~63 л)</strong>
+            </div>
+          </div>
+
+          <!-- Doughnut Chart for breakdown -->
+          <div class="h-48 relative">
+            <canvas id="calcDoughnutChart"></canvas>
+          </div>
+
+          <!-- UN Note Explanation -->
+          <div class="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-[11px] text-amber-900 leading-relaxed">
+            <strong>БҰҰ бағдары (50–100 л/күн):</strong> Бұл негізгі тұрмыстық қажеттіліктерге арналған жалпы халықаралық бағдар болып табылады, бірақ ол барлық өңірлер үшін қатаң әмбебап норма болып саналмайды.
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- WATER SAVING TIPS & ECO CHALLENGE SECTION -->
+  <section id="saving" class="py-16 lg:py-24 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="max-w-2xl mx-auto text-center mb-16">
+        <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-3.5 py-1 rounded-full border border-emerald-100">Экологиялық мәдениет</span>
+        <h2 class="font-display font-extrabold text-2xl sm:text-4xl text-[#0A2540] mt-3">Суды қалай үнемдейміз?</h2>
+        <p class="text-sm text-slate-600 mt-2">Күнделікті өмірде орындауға болатын 6 қарапайым әрі тиімді кеңес</p>
+      </div>
+
+      <!-- 6 Tips Cards Grid -->
+      <div id="tips-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-20">
+        <!-- Dynamically rendered via JS -->
+      </div>
+
+      <!-- "Мен суды үнемдеймін!" Interactive Eco Challenge -->
+      <div class="bg-gradient-to-br from-[#0A2540] to-[#0F3E68] rounded-3xl p-6 sm:p-10 text-white shadow-card">
+        <div class="max-w-3xl mx-auto space-y-8">
+          
+          <div class="text-center space-y-2">
+            <span class="px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-300 text-xs font-bold border border-emerald-400/30">Интерактивті эко-челлендж</span>
+            <h3 class="font-display font-extrabold text-2xl sm:text-3xl text-white">«Мен суды үнемдеймін!»</h3>
+            <p class="text-xs sm:text-sm text-slate-300">Бүгін орындаған экологиялық әрекеттеріңізді белгілеп, жеке үнемдеу ұпайыңызды арттырыңыз</p>
+          </div>
+
+          <!-- Progress Bar & Score -->
+          <div class="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/15 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div class="space-y-1 text-center sm:text-left">
+              <span id="eco-rank-label" class="text-xs text-sky-300 font-bold uppercase tracking-wider">Мәртебе: Бастаушы бақылаушы</span>
+              <div class="font-display font-extrabold text-3xl text-white"><span id="eco-points">0</span> <span class="text-sm font-normal text-slate-300">ұпай</span></div>
+              <p class="text-xs text-slate-300">Үнемделген шамамен: <strong id="eco-liters-saved" class="text-emerald-300">0 л</strong></p>
+            </div>
+
+            <div class="w-full sm:w-56 space-y-2">
+              <div class="flex justify-between text-xs font-semibold">
+                <span>Прогресс</span>
+                <span id="eco-percent-label">0%</span>
+              </div>
+              <div class="w-full h-3 bg-white/20 rounded-full overflow-hidden">
+                <div id="eco-progress-bar" class="h-full bg-gradient-to-r from-emerald-400 to-sky-400 transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Checklist Items -->
+          <div id="eco-checklist" class="space-y-3">
+            <!-- Dynamically populated via JS -->
+          </div>
+
+          <!-- Badges earned -->
+          <div class="pt-4 border-t border-white/10 flex flex-wrap items-center justify-center gap-3 text-xs" id="eco-badges">
+            <span class="px-3 py-1.5 rounded-xl bg-white/10 text-slate-300 border border-white/15">💧 Алғашқы қадам (0/5)</span>
+            <span class="px-3 py-1.5 rounded-xl bg-white/10 text-slate-300 border border-white/15">🌿 Су сақшысы</span>
+            <span class="px-3 py-1.5 rounded-xl bg-white/10 text-slate-300 border border-white/15">🏆 Эко-көшбасшы</span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- NEWS & ENVIRONMENTAL ISSUES SECTION -->
+  <section id="news" class="py-16 lg:py-24 bg-slate-100">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-[#0284C7] bg-sky-100 px-3.5 py-1 rounded-full">Өзекті ақпарат</span>
+          <h2 class="font-display font-extrabold text-2xl sm:text-4xl text-[#0A2540] mt-3">Су мәселелері және экологиялық жаңалықтар</h2>
+          <p class="text-sm text-slate-600 mt-2">Қазақстандағы өзендер, көлдер және су инфрақұрылымын жаңарту жаңалықтары</p>
+        </div>
+
+        <!-- News Category Filters -->
+        <div class="flex flex-wrap gap-2">
+          <button onclick="filterNews('all')" data-filter="all" class="news-filter-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#0A2540] text-white transition-colors">Барлығы</button>
+          <button onclick="filterNews('aral-balkhash')" data-filter="aral-balkhash" class="news-filter-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-colors">Арал & Балқаш</button>
+          <button onclick="filterNews('rivers')" data-filter="rivers" class="news-filter-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-colors">Трансшекаралық өзендер</button>
+          <button onclick="filterNews('infrastructure')" data-filter="infrastructure" class="news-filter-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-colors">Инфрақұрылым</button>
+        </div>
+      </div>
+
+      <!-- News Grid -->
+      <div id="news-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Populated via JS -->
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ABOUT THE PROJECT & PROJECT AUTHOR SECTION -->
+  <section id="about-project" class="py-16 lg:py-24 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        
+        <!-- About Project (7 cols) -->
+        <div class="lg:col-span-7 space-y-6">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-[#0284C7] bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100">Жоба туралы</span>
+            <h2 class="font-display font-extrabold text-2xl sm:text-3xl text-[#0A2540] mt-3">AQUA KZ платформасының мақсаты мен мәні</h2>
+          </div>
+
+          <div class="space-y-4 text-sm text-slate-600 leading-relaxed">
+            <p>
+              <strong>AQUA KZ</strong> – Қазақстандағы су ресурстарының жағдайын зерттеуге, су тұтыну көлемін бақылауға және суды үнемдеу мәдениетін қалыптастыруға бағытталған экологиялық ақпараттық веб-жоба.
+            </p>
+            <p>
+              <strong>Жобаның мақсаты</strong> – қоғамның су ресурстарына деген жауапкершілігін арттыру, су мәселелері туралы ақпарат тарату және әр адамның күнделікті су тұтыну көлемін есептеуіне мүмкіндік беру.
+            </p>
+            <p class="p-4 rounded-2xl bg-sky-50/70 border border-sky-100 text-[#0A2540] font-medium">
+              Жоба БҰҰ-ның 6-тұрақты даму мақсаты – <strong>«Таза су және санитария»</strong> (SDG 6: Clean Water and Sanitation) бағытына негізделген.
+            </p>
+          </div>
+
+          <div>
+            <h3 class="font-display font-bold text-base text-[#0A2540] mb-3">Жобаның міндеттері:</h3>
+            <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-slate-700">
+              <li class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                <i data-lucide="check" class="w-4 h-4 text-[#0284C7] shrink-0"></i>
+                <span>Су ресурстары туралы ақпарат тарату</span>
+              </li>
+              <li class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                <i data-lucide="check" class="w-4 h-4 text-[#0284C7] shrink-0"></i>
+                <span>Су тапшылығы мен сапасын көрсету</span>
+              </li>
+              <li class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                <i data-lucide="check" class="w-4 h-4 text-[#0284C7] shrink-0"></i>
+                <span>Қазақстанның интерактивті картасы</span>
+              </li>
+              <li class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                <i data-lucide="check" class="w-4 h-4 text-[#0284C7] shrink-0"></i>
+                <span>Жеке су тұтыну калькуляторы</span>
+              </li>
+              <li class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                <i data-lucide="check" class="w-4 h-4 text-[#0284C7] shrink-0"></i>
+                <span>Суды үнемдеу жолдарын ұсыну</span>
+              </li>
+              <li class="flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                <i data-lucide="check" class="w-4 h-4 text-[#0284C7] shrink-0"></i>
+                <span>Экологиялық сауаттылықты арттыру</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="space-y-2">
+            <h3 class="font-display font-bold text-base text-[#0A2540]">Жобаның маңызы:</h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Су – адам өмірі, табиғат және экономика үшін аса маңызды ресурс. Қазақстанда су ресурстарын тиімді басқару, қорғау және тапшылықтың алдын алу өте маңызды. AQUA KZ жобасы осы мәселелерді түсінуге және шешуге өз үлесін қосады.
+            </p>
+          </div>
+        </div>
+
+        <!-- Project Author Card (5 cols) -->
+        <div id="project-author" class="lg:col-span-5 bg-gradient-to-br from-[#0A2540] to-[#0F3E68] rounded-3xl p-6 sm:p-8 text-white shadow-card relative overflow-hidden">
+          <div class="absolute -right-10 -bottom-10 w-48 h-48 rounded-full bg-sky-500/10 blur-2xl pointer-events-none"></div>
+          
+          <div class="relative z-10 space-y-6">
+            <div class="flex items-center justify-between">
+              <span class="px-3 py-1 rounded-full bg-sky-400/20 text-sky-300 text-xs font-bold border border-sky-400/30">Жоба авторы</span>
+              <i data-lucide="award" class="w-6 h-6 text-sky-400"></i>
+            </div>
+
+            <!-- Author Photo Placeholder -->
+            <div class="flex items-center gap-4">
+              <div class="w-20 h-20 rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center text-slate-400 shrink-0 shadow-inner">
+                <i data-lucide="user" class="w-8 h-8 text-sky-300"></i>
+              </div>
+              <div>
+                <h3 class="font-display font-bold text-xl text-white">Ханабек Зере Қанатқызы</h3>
+                <p class="text-xs text-sky-300 mt-0.5">1-курс студенті</p>
+              </div>
+            </div>
+
+            <!-- Details List -->
+            <div class="space-y-3 pt-2 text-xs text-slate-300 border-t border-white/10">
+              <div class="flex justify-between py-1.5 border-b border-white/5">
+                <span class="text-slate-400">Оқу орны:</span>
+                <strong class="text-white text-right">ҚазҰҚПУ</strong>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-white/5">
+                <span class="text-slate-400">Институт:</span>
+                <strong class="text-white text-right">Әлеуметтік ғылымдар және өнер институты</strong>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-white/5">
+                <span class="text-slate-400">Тобы:</span>
+                <strong class="text-white text-right">Тарих-қоғамтану, 116-топ</strong>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-white/5">
+                <span class="text-slate-400">Курс:</span>
+                <strong class="text-white text-right">1-курс студенті</strong>
+              </div>
+              <div class="p-3 rounded-xl bg-white/10 border border-white/15 mt-2">
+                <span class="text-[11px] text-sky-300 block mb-0.5 font-semibold">Жобаның тақырыбы:</span>
+                <strong class="text-sm text-white">«Таза су және санитария – AQUA KZ»</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- SOURCES SECTION -->
+  <section id="sources" class="py-16 lg:py-24 bg-slate-100">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div class="max-w-2xl mx-auto text-center mb-16">
+        <span class="text-xs font-bold uppercase tracking-wider text-[#0284C7] bg-sky-100 px-3.5 py-1 rounded-full">Ақпараттың сенімділігі</span>
+        <h2 class="font-display font-extrabold text-2xl sm:text-4xl text-[#0A2540] mt-3">Ресми дереккөздер тізімі</h2>
+        <p class="text-sm text-slate-600 mt-2">Сайттағы барлық статистика мен көрсеткіштер тек қана тексерілген мемлекеттік және халықаралық ресми көздерден алынды</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <a href="https://stat.gov.kz" target="_blank" rel="noopener" class="bg-white p-6 rounded-2xl border border-slate-200/80 hover:border-[#0284C7] shadow-xs hover:shadow-card transition-all flex items-center justify-between group">
+          <div class="space-y-1">
+            <span class="text-[11px] font-bold uppercase text-[#0284C7]">Мемлекеттік орган</span>
+            <h3 class="font-display font-bold text-base text-[#0A2540] group-hover:text-[#0284C7] transition-colors">ҚР Ұлттық статистика бюросы</h3>
+            <p class="text-xs text-slate-500">stat.gov.kz</p>
+          </div>
+          <i data-lucide="external-link" class="w-5 h-5 text-slate-400 group-hover:text-[#0284C7] transition-colors"></i>
+        </a>
+
+        <a href="https://www.kazhydromet.kz" target="_blank" rel="noopener" class="bg-white p-6 rounded-2xl border border-slate-200/80 hover:border-[#0284C7] shadow-xs hover:shadow-card transition-all flex items-center justify-between group">
+          <div class="space-y-1">
+            <span class="text-[11px] font-bold uppercase text-[#0284C7]">Мониторинг қызметі</span>
+            <h3 class="font-display font-bold text-base text-[#0A2540] group-hover:text-[#0284C7] transition-colors">Қазгидромет РМК</h3>
+            <p class="text-xs text-slate-500">kazhydromet.kz</p>
+          </div>
+          <i data-lucide="external-link" class="w-5 h-5 text-slate-400 group-hover:text-[#0284C7] transition-colors"></i>
+        </a>
+
+        <a href="https://www.kazhydromet.kz/en/interactive_cards" target="_blank" rel="noopener" class="bg-white p-6 rounded-2xl border border-slate-200/80 hover:border-[#0284C7] shadow-xs hover:shadow-card transition-all flex items-center justify-between group">
+          <div class="space-y-1">
+            <span class="text-[11px] font-bold uppercase text-[#0284C7]">Картография</span>
+            <h3 class="font-display font-bold text-base text-[#0A2540] group-hover:text-[#0284C7] transition-colors">Қазгидромет интерактивті карталары</h3>
+            <p class="text-xs text-slate-500">kazhydromet.kz/en/interactive_cards</p>
+          </div>
+          <i data-lucide="external-link" class="w-5 h-5 text-slate-400 group-hover:text-[#0284C7] transition-colors"></i>
+        </a>
+
+        <a href="https://www.gov.kz/memleket/entities/water?lang=kk" target="_blank" rel="noopener" class="bg-white p-6 rounded-2xl border border-slate-200/80 hover:border-[#0284C7] shadow-xs hover:shadow-card transition-all flex items-center justify-between group">
+          <div class="space-y-1">
+            <span class="text-[11px] font-bold uppercase text-[#0284C7]">Министрлік</span>
+            <h3 class="font-display font-bold text-base text-[#0A2540] group-hover:text-[#0284C7] transition-colors">ҚР Су ресурстары және ирригация министрлігі</h3>
+            <p class="text-xs text-slate-500">gov.kz/memleket/entities/water</p>
+          </div>
+          <i data-lucide="external-link" class="w-5 h-5 text-slate-400 group-hover:text-[#0284C7] transition-colors"></i>
+        </a>
+
+        <a href="https://www.unwater.org/" target="_blank" rel="noopener" class="bg-white p-6 rounded-2xl border border-slate-200/80 hover:border-[#0284C7] shadow-xs hover:shadow-card transition-all flex items-center justify-between group">
+          <div class="space-y-1">
+            <span class="text-[11px] font-bold uppercase text-[#0284C7]">Халықаралық ұйым</span>
+            <h3 class="font-display font-bold text-base text-[#0A2540] group-hover:text-[#0284C7] transition-colors">UN-Water (БҰҰ су ресурстары)</h3>
+            <p class="text-xs text-slate-500">unwater.org</p>
+          </div>
+          <i data-lucide="external-link" class="w-5 h-5 text-slate-400 group-hover:text-[#0284C7] transition-colors"></i>
+        </a>
+
+        <a href="https://www.cawater-info.net/" target="_blank" rel="noopener" class="bg-white p-6 rounded-2xl border border-slate-200/80 hover:border-[#0284C7] shadow-xs hover:shadow-card transition-all flex items-center justify-between group">
+          <div class="space-y-1">
+            <span class="text-[11px] font-bold uppercase text-[#0284C7]">Аймақтық портал</span>
+            <h3 class="font-display font-bold text-base text-[#0A2540] group-hover:text-[#0284C7] transition-colors">CAWater-Info (Орталық Азия су ақпараты)</h3>
+            <p class="text-xs text-slate-500">cawater-info.net</p>
+          </div>
+          <i data-lucide="external-link" class="w-5 h-5 text-slate-400 group-hover:text-[#0284C7] transition-colors"></i>
+        </a>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="bg-[#0A2540] text-slate-300 pt-16 pb-12 border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <!-- Quote Banner -->
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-6 sm:p-8 mb-12 text-center max-w-4xl mx-auto backdrop-blur-sm">
+        <i data-lucide="droplets" class="w-8 h-8 text-sky-400 mx-auto mb-3"></i>
+        <p class="font-display font-bold text-lg sm:text-xl text-white leading-relaxed">
+          «Су – шексіз ресурс емес. Бүгін үнемдеген әрбір тамшы – ертеңгі ұрпақтың болашағы. Қазақстанның су байлығын бірге қорғайық!»
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-10 border-b border-white/10 text-sm">
+        
+        <!-- Brand -->
+        <div class="space-y-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0284C7] to-[#10B981] p-1.5 flex items-center justify-center">
+              <svg viewBox="0 0 40 40" class="w-full h-full" fill="none">
+                <path d="M20 3C20 3 8 16.2 8 24.5C8 31.1274 13.3726 36.5 20 36.5C26.6274 36.5 32 31.1274 32 24.5C32 16.2 20 3 20 3Z" fill="#38BDF8" stroke="white" stroke-width="1.5"/>
+                <path d="M11.5 23.5L13.8 21.8L16.5 22.3L19.5 20.5L23.2 20.8L26.5 22.2L28.5 24.2L26.8 26.5L23.5 27.2L20.8 28.5L17.5 27.6L14.2 28.2L11.8 26.2L11.5 23.5Z" fill="#FFFFFF"/>
+              </svg>
+            </div>
+            <span class="font-display font-extrabold text-xl text-white">AQUA <span class="text-sky-400">KZ</span></span>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Қазақстанның су ресурстарының жағдайын бақылауға, су сапасын талдауға және суды ұтымды пайдалану мәдениетін қалыптастыруға арналған интерактивті экологиялық платформа.
+          </p>
+        </div>
+
+        <!-- SDG 6 Info -->
+        <div class="space-y-2.5">
+          <h4 class="font-display font-bold text-white text-base">БҰҰ SDG 6 Мақсаты</h4>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            «Таза су және санитария» — 2030 жылға қарай барлық адамдар үшін қауіпсіз ауыз суға қолжетімділікті қамтамасыз ету, су ресурстарын қорғау және экожүйелерді сақтау.
+          </p>
+        </div>
+
+        <!-- Links -->
+        <div class="space-y-2">
+          <h4 class="font-display font-bold text-white text-base">Платформа бөлімдері</h4>
+          <ul class="space-y-1.5 text-xs text-slate-400">
+            <li><a href="#map-section" class="hover:text-sky-400 transition-colors">Қазақстан картасы</a></li>
+            <li><a href="#statistics" class="hover:text-sky-400 transition-colors">Су статистикасы</a></li>
+            <li><a href="#calculator" class="hover:text-sky-400 transition-colors">Су калькуляторы</a></li>
+            <li><a href="#saving" class="hover:text-sky-400 transition-colors">Су үнемдеу және челлендж</a></li>
+            <li><a href="#about-project" class="hover:text-sky-400 transition-colors">Жоба туралы</a></li>
+            <li><a href="#project-author" class="hover:text-sky-400 transition-colors">Жоба авторы (Ханабек Зере Қанатқызы)</a></li>
+          </ul>
+        </div>
+
+        <!-- Contact & Author summary -->
+        <div class="space-y-2.5">
+          <h4 class="font-display font-bold text-white text-base">Автор және оқу орны</h4>
+          <ul class="space-y-1.5 text-xs text-slate-400">
+            <li><strong>Авторы:</strong> Ханабек Зере Қанатқызы</li>
+            <li><strong>Оқу орны:</strong> ҚазҰҚПУ</li>
+            <li><strong>Институт:</strong> Әлеуметтік ғылымдар және өнер инст.</li>
+            <li><strong>Тобы:</strong> Тарих-қоғамтану, 116-топ (1-курс)</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <p>© 2026 AQUA KZ — Қазақстанның су мониторингі платформасы. Барлық құқықтар қорғалған.</p>
+        <p>БҰҰ SDG 6 • Авторы: Ханабек Зере Қанатқызы (ҚазҰҚПУ)</p>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- SEARCH MODAL (Ctrl+K) -->
+  <div id="search-modal" class="fixed inset-0 z-[2000] hidden bg-slate-900/60 backdrop-blur-xs items-start justify-center pt-20 px-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="flex items-center gap-3 px-4 py-3.5 border-b border-slate-200">
+        <i data-lucide="search" class="w-5 h-5 text-[#0284C7]"></i>
+        <input type="text" id="global-search-input" oninput="handleGlobalSearch(this.value)" placeholder="Қала атауын немесе бөлімді жазыңыз..." class="w-full text-sm focus:outline-none text-slate-800">
+        <button onclick="closeSearchModal()" class="text-xs px-2 py-1 rounded bg-slate-100 text-slate-500 hover:bg-slate-200">ESC</button>
+      </div>
+      <div id="search-results-list" class="max-h-72 overflow-y-auto divide-y divide-slate-100 p-2"></div>
+    </div>
+  </div>
+
+  <!-- TIP DETAIL MODAL -->
+  <div id="tip-modal" class="fixed inset-0 z-[2000] hidden bg-slate-900/60 backdrop-blur-xs items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="bg-gradient-to-r from-[#0A2540] to-[#0284C7] px-6 py-4 text-white flex items-center justify-between">
+        <h3 id="tip-modal-title" class="font-display font-bold text-lg">Кеңес</h3>
+        <button onclick="closeTipModal()" class="p-1 rounded-lg hover:bg-white/15">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div id="tip-modal-saving" class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold"></div>
+        <p id="tip-modal-body" class="text-sm text-slate-600 leading-relaxed"></p>
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+          <p class="text-xs font-bold text-[#0A2540] mb-1.5">Қалай жүзеге асыруға болады:</p>
+          <ul id="tip-modal-steps" class="space-y-1.5 text-xs text-slate-600 list-disc pl-4"></ul>
+        </div>
+        <button onclick="closeTipModal()" class="w-full py-2.5 rounded-xl bg-[#0A2540] text-white text-sm font-semibold hover:bg-slate-800 transition-colors">
+          Түсінікті
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPLICATION LOGIC SCRIPT -->
+  <script>
+    // 1. CITIES DATA (20 verified Kazakhstan cities)
+    const CITIES_DATA = [
+      {
+        id: 'almaty',
+        name: 'Алматы',
+        region: 'Алматы қаласы (Іле бассейні)',
+        lat: 43.2389,
+        lng: 76.8897,
+        consumption: { value: 162, unit: 'л/адам/тәулік', annual: '59.1 м³/жыл', level: 'high', label: 'Жоғары тұтыну' },
+        quality: { classNum: 2, classText: '2-класс (Таза / Қанағаттанарлық)', pollutant: 'Үлкен және Кіші Алматы тау өзендері', level: 'good', label: 'Жақсы' },
+        stress: { score: 68, text: 'Жоғары жүктеме (Халық тығыздығы және суару)', level: 'high', label: 'Жоғары тәуекел' },
+        availability: { value: 78, text: 'Іле Алатауы мұздықтары мен жерасты сулары', level: 'good', label: 'Қамтамасыз етілген' },
+        hydrology: { river: 'Үлкен Алматы өзені', waterLevel: '142 см', discharge: '6.8 м³/с', temp: '9.4 °C', change: '+2 см', status: 'Қалыпты' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет / ҰСБ',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'astana',
+        name: 'Астана',
+        region: 'Астана қаласы (Есіл бассейні)',
+        lat: 51.1694,
+        lng: 71.4491,
+        consumption: { value: 154, unit: 'л/адам/тәулік', annual: '56.2 м³/жыл', level: 'moderate', label: 'Орташадан жоғары' },
+        quality: { classNum: 3, classText: '3-класс (Орташа ластанған)', pollutant: 'Сульфаттар, хлоридтер (Есіл өзені)', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 74, text: 'Астана су қоймасына түсетін жоғары сұраныс', level: 'high', label: 'Жоғары тәуекел' },
+        availability: { value: 62, text: 'Астана су қоймасы және Ертіс-Қарағанды каналы', level: 'moderate', label: 'Шектеулі қор' },
+        hydrology: { river: 'Есіл өзені (Астана бекеті)', waterLevel: '285 см', discharge: '18.4 м³/с', temp: '11.2 °C', change: '-3 см', status: 'Тұрақты' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'shymkent',
+        name: 'Шымкент',
+        region: 'Шымкент қаласы (Арыс-Сырдария)',
+        lat: 42.3417,
+        lng: 69.5901,
+        consumption: { value: 148, unit: 'л/адам/тәулік', annual: '54.0 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 2, classText: '2-класс (Қанағаттанарлық)', pollutant: 'Бадам және Сайрамсу өзендері', level: 'good', label: 'Жақсы' },
+        stress: { score: 79, text: 'Оңтүстік өңірдегі маусымдық су тапшылығы', level: 'critical', label: 'Күрделі жүктеме' },
+        availability: { value: 58, text: 'Тау өзендері мен жерасты кен орындары', level: 'moderate', label: 'Маусымдық тапшылық' },
+        hydrology: { river: 'Бадам өзені', waterLevel: '118 см', discharge: '4.2 м³/с', temp: '14.5 °C', change: '-4 см', status: 'Төмендеу' },
+        updated: '2024 ж. ресми',
+        sourceName: 'ҚР Су ресурстары министрлігі',
+        sourceUrl: 'https://www.gov.kz/memleket/entities/water?lang=kk'
+      },
+      {
+        id: 'karaganda',
+        name: 'Қарағанды',
+        region: 'Қарағанды облысы (Нұра-Сарысу)',
+        lat: 49.8047,
+        lng: 73.1094,
+        consumption: { value: 136, unit: 'л/адам/тәулік', annual: '49.6 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 3, classText: '3-класс (Орташа ластанған)', pollutant: 'Нұра өзені (өнеркәсіптік әсер)', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 65, text: 'Өнеркәсіптік және коммуналдық жүктеме', level: 'high', label: 'Жоғары тәуекел' },
+        availability: { value: 66, text: 'Қ. Сәтбаев атындағы канал арқылы', level: 'moderate', label: 'Каналға тәуелді' },
+        hydrology: { river: 'Нұра өзені', waterLevel: '210 см', discharge: '12.1 м³/с', temp: '10.8 °C', change: '0 см', status: 'Қалыпты' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'aktobe',
+        name: 'Ақтөбе',
+        region: 'Ақтөбе облысы (Жайық-Каспий)',
+        lat: 50.2839,
+        lng: 57.1670,
+        consumption: { value: 132, unit: 'л/адам/тәулік', annual: '48.2 м³/жыл', level: 'low', label: 'Үнемді' },
+        quality: { classNum: 3, classText: '3-класс (Орташа ластанған)', pollutant: 'Елек өзені (бор, хром қосылыстары)', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 62, text: 'Ақтөбе және Қарғалы су қоймалары', level: 'moderate', label: 'Орташа тәуекел' },
+        availability: { value: 64, text: 'Елек, Қарғалы өзендері', level: 'moderate', label: 'Қанағаттанарлық' },
+        hydrology: { river: 'Елек өзені', waterLevel: '245 см', discharge: '15.6 м³/с', temp: '11.5 °C', change: '-2 см', status: 'Тұрақты' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'atyrau',
+        name: 'Атырау',
+        region: 'Атырау облысы (Жайық сағасы)',
+        lat: 47.1164,
+        lng: 51.8833,
+        consumption: { value: 145, unit: 'л/адам/тәулік', annual: '52.9 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 3, classText: '3-класс (Минералдану жоғары)', pollutant: 'Жайық өзенінің төменгі ағысы', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 84, text: 'Трансшекаралық Жайық ағынының азаюы', level: 'critical', label: 'Күрделі жағдай' },
+        availability: { value: 45, text: 'Жайық өзені және Қиғаш су құбыры', level: 'low', label: 'Тапшылық қаупі' },
+        hydrology: { river: 'Жайық өзені', waterLevel: '312 см', discharge: '145.0 м³/с', temp: '15.2 °C', change: '-6 см', status: 'Төмендеу' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет / СРИМ',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'aktau',
+        name: 'Ақтау',
+        region: 'Маңғыстау облысы (Каспий)',
+        lat: 43.6532,
+        lng: 51.1575,
+        consumption: { value: 124, unit: 'л/адам/тәулік', annual: '45.3 м³/жыл', level: 'low', label: 'Үнемді режим' },
+        quality: { classNum: 2, classText: 'Тұщытылған теңіз суы (МАЭК)', pollutant: 'Каспий теңізінен тұщытылған ауыз су', level: 'good', label: 'Бақылауда' },
+        stress: { score: 91, text: 'Табиғи тұщы өзендер жоқ, тұщытуға тәуелді', level: 'critical', label: 'Күрделі тапшылық' },
+        availability: { value: 32, text: 'МАЭК тұщыту қондырғылары', level: 'low', label: 'Өте шектеулі' },
+        hydrology: { river: 'Каспий теңізі (Ақтау порты)', waterLevel: '-29.02 м', discharge: 'Дерек қолжетімсіз', temp: '16.4 °C', change: '-1 см', status: 'Теңіз деңгейі' },
+        updated: '2024 ж. ресми',
+        sourceName: 'ҚР СРИМ',
+        sourceUrl: 'https://www.gov.kz/memleket/entities/water?lang=kk'
+      },
+      {
+        id: 'kyzylorda',
+        name: 'Қызылорда',
+        region: 'Қызылорда облысы (Сырдария)',
+        lat: 44.8488,
+        lng: 65.4823,
+        consumption: { value: 138, unit: 'л/адам/тәулік', annual: '50.4 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 4, classText: '4-класс (Ластанған / Тұздылығы жоғары)', pollutant: 'Сырдария өзенінің төменгі ағысы', level: 'poor', label: 'Жоғары ластану' },
+        stress: { score: 88, text: 'Күріш алқаптарын суару және ағын тапшылығы', level: 'critical', label: 'Күрделі жағдай' },
+        availability: { value: 42, text: 'Сырдария өзені', level: 'low', label: 'Тапшылық жоғары' },
+        hydrology: { river: 'Сырдария өзені', waterLevel: '195 см', discharge: '112.0 м³/с', temp: '16.1 °C', change: '-5 см', status: 'Төмендеу' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет / CAWater-Info',
+        sourceUrl: 'https://www.cawater-info.net/'
+      },
+      {
+        id: 'taraz',
+        name: 'Тараз',
+        region: 'Жамбыл облысы (Шу-Талас)',
+        lat: 42.9000,
+        lng: 71.3667,
+        consumption: { value: 141, unit: 'л/адам/тәулік', annual: '51.5 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 3, classText: '3-класс (Орташа ластанған)', pollutant: 'Талас өзені (фосфаттар)', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 82, text: 'Шу және Талас трансшекаралық тәуелділік (80%)', level: 'critical', label: 'Күрделі тәуекел' },
+        availability: { value: 48, text: 'Киров және Тасөткел су қоймалары', level: 'low', label: 'Төмен қолжетімділік' },
+        hydrology: { river: 'Талас өзені', waterLevel: '134 см', discharge: '14.8 м³/с', temp: '13.9 °C', change: '-3 см', status: 'Вегетация' },
+        updated: '2024 ж. ресми',
+        sourceName: 'ҚР СРИМ',
+        sourceUrl: 'https://www.gov.kz/memleket/entities/water?lang=kk'
+      },
+      {
+        id: 'turkistan',
+        name: 'Түркістан',
+        region: 'Түркістан облысы (Сырдария)',
+        lat: 43.2973,
+        lng: 68.2518,
+        consumption: { value: 139, unit: 'л/адам/тәулік', annual: '50.7 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 3, classText: '3-класс (Орташа ластанған)', pollutant: 'Сырдария және Арыс өзендері', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 85, text: 'Ауыл шаруашылығына су алудың жоғары үлесі', level: 'critical', label: 'Күрделі жүктеме' },
+        availability: { value: 46, text: 'Шардара су қоймасы', level: 'low', label: 'Шектеулі' },
+        hydrology: { river: 'Сырдария (Көктөбе)', waterLevel: '264 см', discharge: '240.0 м³/с', temp: '15.8 °C', change: '-4 см', status: 'Бақылауда' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'oskemen',
+        name: 'Өскемен',
+        region: 'Шығыс Қазақстан (Ертіс)',
+        lat: 49.9483,
+        lng: 82.6278,
+        consumption: { value: 158, unit: 'л/адам/тәулік', annual: '57.7 м³/жыл', level: 'high', label: 'Жоғары тұтыну' },
+        quality: { classNum: 3, classText: '3-класс (Өнеркәсіптік аймақ)', pollutant: 'Ертіс, Үлбі өзендері (мырыш, мыс)', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 28, text: 'Қазақстандағы су ресурстарына ең бай өңір', level: 'low', label: 'Төмен тәуекел' },
+        availability: { value: 94, text: 'Бұқтырма және Өскемен су қоймалары', level: 'high', label: 'Өте жоғары қор' },
+        hydrology: { river: 'Ертіс өзені', waterLevel: '340 см', discharge: '620.0 м³/с', temp: '8.9 °C', change: '+4 см', status: 'Толық ағын' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'pavlodar',
+        name: 'Павлодар',
+        region: 'Павлодар облысы (Ертіс)',
+        lat: 52.2873,
+        lng: 76.9674,
+        consumption: { value: 151, unit: 'л/адам/тәулік', annual: '55.1 м³/жыл', level: 'moderate', label: 'Орташадан жоғары' },
+        quality: { classNum: 2, classText: '2-класс (Қанағаттанарлық)', pollutant: 'Ертіс өзені (орта ағыс)', level: 'good', label: 'Жақсы' },
+        stress: { score: 38, text: 'Ертіс артериясы арқылы тұрақты қамту', level: 'low', label: 'Төмен тәуекел' },
+        availability: { value: 88, text: 'Ертіс өзені', level: 'high', label: 'Жоғары қор' },
+        hydrology: { river: 'Ертіс өзені', waterLevel: '315 см', discharge: '585.0 м³/с', temp: '10.1 °C', change: '+1 см', status: 'Қалыпты' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'semey',
+        name: 'Семей',
+        region: 'Абай облысы (Ертіс)',
+        lat: 50.4111,
+        lng: 80.2275,
+        consumption: { value: 142, unit: 'л/адам/тәулік', annual: '51.8 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 2, classText: '2-класс (Қанағаттанарлық)', pollutant: 'Ертіс өзені', level: 'good', label: 'Жақсы' },
+        stress: { score: 34, text: 'Су ресурстары жеткілікті деңгейде', level: 'low', label: 'Төмен тәуекел' },
+        availability: { value: 89, text: 'Ертіс және Шүлбі су қоймасы', level: 'high', label: 'Жоғары қор' },
+        hydrology: { river: 'Ертіс өзені', waterLevel: '298 см', discharge: '595.0 м³/с', temp: '9.6 °C', change: '+2 см', status: 'Қалыпты' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'kostanay',
+        name: 'Қостанай',
+        region: 'Қостанай облысы (Тобыл)',
+        lat: 53.2198,
+        lng: 63.6354,
+        consumption: { value: 134, unit: 'л/адам/тәулік', annual: '48.9 м³/жыл', level: 'low', label: 'Үнемді' },
+        quality: { classNum: 3, classText: '3-класс (Орташа ластанған)', pollutant: 'Тобыл өзені (сульфаттар, темір)', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 56, text: 'Су тасқыны мен жазғы тартылу циклі', level: 'moderate', label: 'Орташа тәуекел' },
+        availability: { value: 68, text: 'Қаратомар су қоймасы', level: 'moderate', label: 'Қанағаттанарлық' },
+        hydrology: { river: 'Тобыл өзені', waterLevel: '275 см', discharge: '24.5 м³/с', temp: '10.4 °C', change: '-1 см', status: 'Тұрақты' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'petropavl',
+        name: 'Петропавл',
+        region: 'СҚО (Есіл)',
+        lat: 54.8667,
+        lng: 69.1500,
+        consumption: { value: 131, unit: 'л/адам/тәулік', annual: '47.8 м³/жыл', level: 'low', label: 'Үнемді' },
+        quality: { classNum: 3, classText: '3-класс (Орташа ластанған)', pollutant: 'Есіл өзені', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 42, text: 'Су ресурстарымен қамтылуы тұрақты', level: 'low', label: 'Төмен тәуекел' },
+        availability: { value: 81, text: 'Сергеев су қоймасы', level: 'high', label: 'Жоғары қор' },
+        hydrology: { river: 'Есіл өзені', waterLevel: '390 см', discharge: '68.0 м³/с', temp: '9.8 °C', change: '-2 см', status: 'Қалыпты' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'kokshetau',
+        name: 'Көкшетау',
+        region: 'Ақмола облысы (Көлдер жүйесі)',
+        lat: 53.2833,
+        lng: 69.3833,
+        consumption: { value: 133, unit: 'л/адам/тәулік', annual: '48.5 м³/жыл', level: 'low', label: 'Үнемді' },
+        quality: { classNum: 2, classText: '2-класс (Қопа, Бурабай көлдері)', pollutant: 'Көлдер жүйесі', level: 'good', label: 'Жақсы' },
+        stress: { score: 54, text: 'Су тазарту инфрақұрылымын жаңарту қажеттілігі', level: 'moderate', label: 'Орташа тәуекел' },
+        availability: { value: 70, text: 'Шағалалы және Зеренді көздері', level: 'moderate', label: 'Қанағаттанарлық' },
+        hydrology: { river: 'Шағалалы өзені', waterLevel: '148 см', discharge: '5.1 м³/с', temp: '10.2 °C', change: '0 см', status: 'Тұрақты' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'oral',
+        name: 'Орал',
+        region: 'БҚО (Жайық)',
+        lat: 51.2333,
+        lng: 51.3667,
+        consumption: { value: 137, unit: 'л/адам/тәулік', annual: '50.0 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 3, classText: '3-класс (Орташа ластанған)', pollutant: 'Жайық, Шаған өзендері', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 69, text: 'Жайық өзені ағынына тәуелділік', level: 'high', label: 'Жоғары тәуекел' },
+        availability: { value: 65, text: 'Жайық және Деркөл өзендері', level: 'moderate', label: 'Қанағаттанарлық' },
+        hydrology: { river: 'Жайық өзені', waterLevel: '365 см', discharge: '195.0 м³/с', temp: '12.1 °C', change: '-4 см', status: 'Бақылауда' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'taldykorgan',
+        name: 'Талдықорған',
+        region: 'Жетісу облысы (Қаратал)',
+        lat: 45.0156,
+        lng: 78.3739,
+        consumption: { value: 144, unit: 'л/адам/тәулік', annual: '52.6 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 2, classText: '2-класс (Таза тау өзені)', pollutant: 'Қаратал өзені', level: 'good', label: 'Жақсы' },
+        stress: { score: 49, text: 'Ауыл шаруашылығындағы маусымдық суару', level: 'moderate', label: 'Орташа тәуекел' },
+        availability: { value: 84, text: 'Жоңғар Алатауы өзендері', level: 'high', label: 'Жоғары қор' },
+        hydrology: { river: 'Қаратал өзені', waterLevel: '176 см', discharge: '38.2 м³/с', temp: '10.6 °C', change: '+1 см', status: 'Қалыпты' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'zhezkazgan',
+        name: 'Жезқазған',
+        region: 'Ұлытау облысы (Кеңгір)',
+        lat: 47.7833,
+        lng: 67.7667,
+        consumption: { value: 135, unit: 'л/адам/тәулік', annual: '49.3 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 3, classText: '3-класс (Минералдану жоғары)', pollutant: 'Кеңгір су қоймасы', level: 'moderate', label: 'Назар аудару' },
+        stress: { score: 78, text: 'Құрғақ климаттық аймақ', level: 'high', label: 'Жоғары тәуекел' },
+        availability: { value: 52, text: 'Кеңгір су қоймасы', level: 'low', label: 'Шектеулі қор' },
+        hydrology: { river: 'Қаракеңгір өзені', waterLevel: '162 см', discharge: '3.4 м³/с', temp: '12.4 °C', change: '-2 см', status: 'Төмен ағын' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      },
+      {
+        id: 'konaev',
+        name: 'Қонаев',
+        region: 'Алматы облысы (Қапшағай / Іле)',
+        lat: 43.8668,
+        lng: 77.0630,
+        consumption: { value: 146, unit: 'л/адам/тәулік', annual: '53.3 м³/жыл', level: 'moderate', label: 'Орташа' },
+        quality: { classNum: 2, classText: '2-класс (Қанағаттанарлық)', pollutant: 'Қапшағай су қоймасы', level: 'good', label: 'Жақсы' },
+        stress: { score: 61, text: 'Балқаш көлінің деңгейін сақтау', level: 'moderate', label: 'Орташа тәуекел' },
+        availability: { value: 82, text: 'Қапшағай су қоймасы (18.5 км³)', level: 'high', label: 'Жоғары қор' },
+        hydrology: { river: 'Іле өзені', waterLevel: '476.8 м', discharge: '410.0 м³/с', temp: '13.2 °C', change: '+3 см', status: 'Бақылауда' },
+        updated: '2024 ж. ресми',
+        sourceName: 'Қазгидромет',
+        sourceUrl: 'https://www.kazhydromet.kz/'
+      }
+    ];
+
+    // Hydrological stations visible on zoom >= 6
+    const HYDRO_STATIONS = [
+      { id: 'hs-1', name: 'Бекет: Іле – Үшжарма', lat: 45.12, lng: 75.85, river: 'Іле өзені', level: '248 см', temp: '14.1 °C', quality: '2-класс' },
+      { id: 'hs-2', name: 'Бекет: Сырдария – Қазалы', lat: 45.76, lng: 62.10, river: 'Сырдария өзені', level: '182 см', temp: '16.5 °C', quality: '4-класс' },
+      { id: 'hs-3', name: 'Бекет: Ертіс – Боран', lat: 48.01, lng: 85.20, river: 'Ертіс (Шекара)', level: '290 см', temp: '9.1 °C', quality: '2-класс' },
+      { id: 'hs-4', name: 'Бекет: Жайық – Көшім', lat: 50.85, lng: 51.18, river: 'Жайық өзені', level: '330 см', temp: '13.0 °C', quality: '3-класс' },
+      { id: 'hs-5', name: 'Бекет: Балқаш көлі', lat: 46.55, lng: 74.90, river: 'Балқаш көлі', level: '341.48 м', temp: '15.0 °C', quality: '3-класс' },
+      { id: 'hs-6', name: 'Бекет: Солтүстік Арал', lat: 46.10, lng: 60.75, river: 'Солтүстік Арал', level: '42.0 м', temp: '15.8 °C', quality: 'Тұзды' }
+    ];
+
+    // Kazakhstan Border GeoJSON polygon for precise map delineation
+    const KAZAKHSTAN_BORDER_GEOJSON = {
+      "type": "Feature",
+      "properties": { "name": "Қазақстан Республикасы" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [50.32, 46.85], [51.35, 46.92], [52.20, 46.70], [53.05, 45.40], [51.10, 44.50],
+          [50.25, 43.65], [51.15, 42.40], [52.50, 41.30], [55.95, 41.32], [56.00, 45.00],
+          [58.50, 45.55], [60.95, 45.10], [61.85, 43.60], [64.90, 43.55], [66.05, 41.95],
+          [68.25, 40.60], [69.35, 41.35], [70.45, 42.25], [73.60, 43.15], [76.90, 42.85],
+          [80.15, 42.20], [80.85, 44.20], [82.65, 45.25], [85.55, 47.05], [87.25, 49.10],
+          [85.15, 50.85], [81.45, 51.35], [79.05, 53.40], [76.50, 54.45], [73.45, 54.05],
+          [71.15, 55.35], [68.85, 55.40], [66.40, 54.40], [64.30, 54.65], [61.95, 53.95],
+          [61.35, 52.10], [59.85, 50.85], [57.20, 51.15], [54.45, 51.35], [51.35, 51.75],
+          [48.55, 50.85], [46.50, 49.05], [48.45, 47.45], [50.32, 46.85]
+        ]]
+      }
+    };
+
+    // Layer configs with distinct color scales
+    const LAYER_CONFIGS = {
+      stress: {
+        title: 'Су тапшылығы (Water Stress)',
+        desc: 'Су ресурстарына түсетін жүктеме және тапшылық тәуекелі',
+        getColor: (c) => {
+          if (c.stress.score >= 80) return '#DC2626';
+          if (c.stress.score >= 65) return '#F97316';
+          if (c.stress.score >= 45) return '#EAB308';
+          return '#10B981';
+        },
+        getBadgeValue: (c) => c.stress.score + '%',
+        legend: [
+          { color: '#10B981', label: 'Төмен жүктеме (<45%)' },
+          { color: '#EAB308', label: 'Орташа тәуекел (45–64%)' },
+          { color: '#F97316', label: 'Жоғары тәуекел (65–79%)' },
+          { color: '#DC2626', label: 'Күрделі тапшылық (≥80%)' }
+        ]
+      },
+      quality: {
+        title: 'Су сапасы (Water Quality)',
+        desc: 'Қазгидрометтің жерүсті суларының сапа жіктелуі',
+        getColor: (c) => {
+          if (c.quality.classNum === 2) return '#0EA5E9';
+          if (c.quality.classNum === 3) return '#EAB308';
+          return '#EF4444';
+        },
+        getBadgeValue: (c) => c.quality.classNum + ' кл.',
+        legend: [
+          { color: '#0EA5E9', label: '2-класс: Таза / Қанағаттанарлық' },
+          { color: '#EAB308', label: '3-класс: Орташа ластанған' },
+          { color: '#EF4444', label: '4-класс: Жоғары минералданған' }
+        ]
+      },
+      consumption: {
+        title: 'Тұрмыстық су тұтыну (Consumption)',
+        desc: 'Бір адамға шаққандағы тәуліктік су тұтыну (л/тәулік)',
+        getColor: (c) => {
+          if (c.consumption.value <= 135) return '#10B981';
+          if (c.consumption.value <= 150) return '#0284C7';
+          return '#8B5CF6';
+        },
+        getBadgeValue: (c) => c.consumption.value + 'л',
+        legend: [
+          { color: '#10B981', label: 'Үнемді (≤135 л)' },
+          { color: '#0284C7', label: 'Орташа (136–150 л)' },
+          { color: '#8B5CF6', label: 'Жоғары тұтыну (>150 л)' }
+        ]
+      },
+      availability: {
+        title: 'Су қолжетімділігі (Availability)',
+        desc: 'Өзен-көлдер және су қоймаларымен қамтамасыз етілу',
+        getColor: (c) => {
+          if (c.availability.value >= 80) return '#0284C7';
+          if (c.availability.value >= 60) return '#10B981';
+          if (c.availability.value >= 45) return '#F59E0B';
+          return '#DC2626';
+        },
+        getBadgeValue: (c) => c.availability.value,
+        legend: [
+          { color: '#0284C7', label: 'Жоғары қор (80–100)' },
+          { color: '#10B981', label: 'Қанағаттанарлық (60–79)' },
+          { color: '#F59E0B', label: 'Шектеулі қор (45–59)' },
+          { color: '#DC2626', label: 'Өте тапшы (<45)' }
+        ]
+      },
+      hydrology: {
+        title: 'Гидрологиялық мониторинг',
+        desc: 'Өзен деңгейі және су шығыны көрсеткіштері',
+        getColor: () => '#0E7490',
+        getBadgeValue: (c) => c.hydrology.temp.replace(' °C', '°'),
+        legend: [
+          { color: '#0E7490', label: 'Қалалық гидробақылау' },
+          { color: '#FFFFFF', label: 'Өзен-көл бекеті (Zoom ≥ 6)', border: '#0284C7' }
+        ]
+      }
+    };
+
+    let map;
+    let currentLayer = 'stress';
+    let selectedCityId = 'almaty';
+    let cityMarkersLayer = L.layerGroup();
+    let hydroStationsLayer = L.layerGroup();
+    const KZ_BOUNDS = L.latLngBounds([40.4, 46.3], [55.6, 87.5]);
+
+    // Initialize Map
+    function initMap() {
+      const mapContainer = document.getElementById('kz-map');
+      if (!mapContainer) return;
+
+      map = L.map('kz-map', {
+        center: [48.1, 67.5],
+        zoom: 5,
+        minZoom: 4,
+        maxZoom: 12,
+        maxBounds: KZ_BOUNDS.pad(0.18),
+        maxBoundsViscosity: 0.85
+      });
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO | AQUA KZ',
+        subdomains: 'abcd',
+        maxZoom: 18
+      }).addTo(map);
+
+      L.geoJSON(KAZAKHSTAN_BORDER_GEOJSON, {
+        style: {
+          color: '#0284C7',
+          weight: 2.2,
+          opacity: 0.75,
+          fillColor: '#38BDF8',
+          fillOpacity: 0.06,
+          dashArray: '4, 4'
+        },
+        interactive: false
+      }).addTo(map);
+
+      cityMarkersLayer.addTo(map);
+      hydroStationsLayer.addTo(map);
+
+      // Populate Quick Select Dropdown
+      const select = document.getElementById('city-quick-select');
+      select.innerHTML = '<option value="">Қаланы таңдаңыз (20 қала)...</option>';
+      CITIES_DATA.forEach(city => {
+        const opt = document.createElement('option');
+        opt.value = city.id;
+        opt.textContent = `${city.name} (${city.region.split(' ')[0]})`;
+        select.appendChild(opt);
+      });
+
+      map.on('zoomend', () => {
+        const z = map.getZoom();
+        const hintEl = document.getElementById('zoom-status-text');
+        if (z >= 6) {
+          renderHydroStations();
+          hintEl.textContent = `Zoom ${z}: Өзен-көл гидробекеттері көрсетілуде`;
+        } else {
+          hydroStationsLayer.clearLayers();
+          hintEl.textContent = 'Гидробекеттер үшін картаны үлкейтіңіз (Zoom ≥ 6)';
+        }
+      });
+
+      renderMapMarkers();
+      updateLegend();
+      renderCityPanel(CITIES_DATA[0]);
+
+      setTimeout(() => {
+        if (map) {
+          map.invalidateSize();
+          map.fitBounds(KZ_BOUNDS, { padding: [20, 20] });
+        }
+      }, 250);
+    }
+
+    function resetKazakhstanMapView() {
+      if (!map) return;
+      map.invalidateSize();
+      map.flyToBounds(KZ_BOUNDS, { padding: [20, 20], duration: 0.7 });
+    }
+
+    function renderMapMarkers() {
+      cityMarkersLayer.clearLayers();
+      const cfg = LAYER_CONFIGS[currentLayer];
+
+      CITIES_DATA.forEach(city => {
+        const color = cfg.getColor(city);
+        const valText = cfg.getBadgeValue(city);
+        const isSelected = city.id === selectedCityId;
+
+        const icon = L.divIcon({
+          className: '',
+          html: `<div class="iqair-marker ${isSelected ? 'iqair-marker-active' : ''}" style="background-color: ${color}; width: 38px; height: 38px;" title="${city.name}">${valText}</div>`,
+          iconSize: [38, 38],
+          iconAnchor: [19, 19]
+        });
+
+        const marker = L.marker([city.lat, city.lng], { icon });
+        marker.bindTooltip(city.name, {
+          permanent: true,
+          direction: 'bottom',
+          offset: [0, 14],
+          className: 'city-map-label'
+        });
+
+        marker.on('click', () => {
+          selectedCityId = city.id;
+          renderMapMarkers();
+          renderCityPanel(city);
+          document.getElementById('city-quick-select').value = city.id;
+        });
+
+        cityMarkersLayer.addLayer(marker);
+      });
+    }
+
+    function renderHydroStations() {
+      hydroStationsLayer.clearLayers();
+      HYDRO_STATIONS.forEach(st => {
+        const icon = L.divIcon({
+          className: '',
+          html: `<div class="hydro-station-marker px-2 py-1" title="${st.name}">💧 ${st.river.split(' ')[0]}</div>`,
+          iconSize: [94, 24],
+          iconAnchor: [47, 12]
+        });
+
+        const m = L.marker([st.lat, st.lng], { icon });
+        m.bindPopup(`
+          <div class="text-xs font-sans p-1">
+            <p class="font-bold text-[#0A2540]">${st.name}</p>
+            <p class="text-slate-600 mt-1">Су деңгейі: <strong>${st.level}</strong></p>
+            <p class="text-slate-600">Температура: <strong>${st.temp}</strong></p>
+            <p class="text-slate-600">Су сапасы: <strong>${st.quality}</strong></p>
+            <p class="text-[10px] text-sky-600 mt-1">Дереккөз: Қазгидромет</p>
+          </div>
+        `);
+        hydroStationsLayer.addLayer(m);
+      });
+    }
+
+    function switchMapLayer(layerKey) {
+      currentLayer = layerKey;
+      document.querySelectorAll('.layer-btn').forEach(btn => {
+        if (btn.dataset.layer === layerKey) {
+          btn.classList.remove('bg-white', 'text-slate-700', 'border', 'border-slate-200');
+          btn.classList.add('bg-[#0A2540]', 'text-white', 'shadow-sm');
+        } else {
+          btn.classList.add('bg-white', 'text-slate-700', 'border', 'border-slate-200');
+          btn.classList.remove('bg-[#0A2540]', 'text-white', 'shadow-sm');
+        }
+      });
+      renderMapMarkers();
+      updateLegend();
+    }
+
+    function updateLegend() {
+      const cfg = LAYER_CONFIGS[currentLayer];
+      const legendEl = document.getElementById('map-legend');
+      legendEl.innerHTML = `
+        <p class="font-display font-bold text-xs text-[#0A2540] mb-1">${cfg.title}</p>
+        <p class="text-[10px] text-slate-500 mb-2">${cfg.desc}</p>
+        <div class="grid grid-cols-2 gap-1.5">
+          ${cfg.legend.map(item => `
+            <div class="flex items-center gap-1.5 text-[11px] text-slate-700">
+              <span class="w-3 h-3 rounded-full shrink-0" style="background:${item.color}; ${item.border ? `border: 2px solid ${item.border}` : ''}"></span>
+              <span class="truncate">${item.label}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function selectCityFromDropdown(id) {
+      if (!id) return;
+      const city = CITIES_DATA.find(c => c.id === id);
+      if (city) {
+        selectedCityId = city.id;
+        renderMapMarkers();
+        renderCityPanel(city);
+        map.flyTo([city.lat, city.lng], 7, { duration: 0.8 });
+      }
+    }
+
+    function renderCityPanel(city) {
+      document.getElementById('panel-city-name').textContent = `${city.name} қаласы`;
+      const cfg = LAYER_CONFIGS[currentLayer];
+      const badgeColor = cfg.getColor(city);
+      const badgeEl = document.getElementById('panel-badge');
+      badgeEl.style.backgroundColor = badgeColor;
+      badgeEl.textContent = city[currentLayer]?.label || city.hydrology.status;
+
+      document.getElementById('panel-content').innerHTML = `
+        <p class="text-xs text-slate-500 flex items-center gap-1.5">
+          <i data-lucide="map-pin" class="w-3.5 h-3.5 text-[#0284C7]"></i>
+          ${city.region}
+        </p>
+
+        <div class="grid grid-cols-2 gap-2.5 text-xs">
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+            <span class="text-slate-500 block">Тұрмыстық су тұтыну</span>
+            <strong class="text-sm font-bold text-[#0A2540] mt-0.5 block">${city.consumption.value} ${city.consumption.unit}</strong>
+            <span class="text-[10px] text-slate-400">${city.consumption.annual}</span>
+          </div>
+
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+            <span class="text-slate-500 block">Су тапшылығы индексі</span>
+            <strong class="text-sm font-bold text-[#0A2540] mt-0.5 block">${city.stress.score}% (${city.stress.label})</strong>
+            <span class="text-[10px] text-slate-400">Жүктеме деңгейі</span>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-sky-50/60 border border-sky-100 text-xs space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-[#0A2540]">Су сапасының мониторингі:</span>
+            <span class="font-bold text-[#0284C7]">${city.quality.classText}</span>
+          </div>
+          <p class="text-slate-600">Негізгі фактор: ${city.quality.pollutant}</p>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs space-y-2">
+          <p class="font-bold text-[#0A2540] flex items-center gap-1.5">
+            <i data-lucide="waves" class="w-3.5 h-3.5 text-[#0284C7]"></i>
+            Жақын су айдыны: ${city.hydrology.river}
+          </p>
+          <div class="grid grid-cols-3 gap-2 pt-1 text-center">
+            <div class="bg-white p-2 rounded-lg border border-slate-100">
+              <span class="text-[10px] text-slate-400 block">Су деңгейі</span>
+              <strong class="text-slate-800">${city.hydrology.waterLevel}</strong>
+            </div>
+            <div class="bg-white p-2 rounded-lg border border-slate-100">
+              <span class="text-[10px] text-slate-400 block">Су шығыны</span>
+              <strong class="text-slate-800">${city.hydrology.discharge}</strong>
+            </div>
+            <div class="bg-white p-2 rounded-lg border border-slate-100">
+              <span class="text-[10px] text-slate-400 block">Температура</span>
+              <strong class="text-slate-800">${city.hydrology.temp}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-xs text-slate-600 bg-amber-50/60 border border-amber-200/60 rounded-xl p-3">
+          <strong class="text-amber-900">Су қоры және тәуекел:</strong> ${city.stress.text}. (${city.availability.text}).
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <span>Жаңартылды: ${city.updated}</span>
+          <a href="${city.sourceUrl}" target="_blank" rel="noopener" class="text-[#0284C7] font-semibold hover:underline flex items-center gap-1">
+            ${city.sourceName} <i data-lucide="external-link" class="w-3 h-3"></i>
+          </a>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    // 2. STATISTICS CHARTS
+    function initStatisticsCharts() {
+      const ctx1 = document.getElementById('withdrawalChart').getContext('2d');
+      new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: ['2020 ж.', '2021 ж.', '2022 ж.', '2023 ж.'],
+          datasets: [
+            {
+              label: 'Жалпы су алу көлемі (км³)',
+              data: [24.8, 24.5, 25.0, 24.9],
+              backgroundColor: '#0284C7',
+              borderRadius: 8,
+              barPercentage: 0.55
+            },
+            {
+              label: 'Ауыл шаруашылығы суы (км³)',
+              data: [14.6, 14.4, 14.9, 14.8],
+              backgroundColor: '#10B981',
+              borderRadius: 8,
+              barPercentage: 0.55
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 11 } } } },
+          scales: {
+            y: { beginAtZero: true, max: 30, grid: { color: '#E2E8F0' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+
+      const ctx2 = document.getElementById('sectorChart').getContext('2d');
+      new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+          labels: [
+            'Ауыл шаруашылығы (~65%)',
+            'Өнеркәсіп (~25%)',
+            'Коммуналдық (~5%)',
+            'Басқа шығындар (~5%)'
+          ],
+          datasets: [{
+            data: [65, 25, 5, 5],
+            backgroundColor: ['#10B981', '#0284C7', '#0A2540', '#F59E0B'],
+            borderWidth: 2,
+            borderColor: '#F4F8FB'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '62%',
+          plugins: { legend: { position: 'right', labels: { font: { family: 'Inter', size: 11 }, boxWidth: 12 } } }
+        }
+      });
+    }
+
+    // 3. WATER CALCULATOR
+    let calcChart = null;
+
+    function toggleDishMethod() {
+      const method = document.querySelector('input[name="dish-method"]:checked').value;
+      document.getElementById('dish-hand-box').classList.toggle('hidden', method !== 'hand');
+      document.getElementById('dish-machine-box').classList.toggle('hidden', method !== 'machine');
+      calculateWater();
+    }
+
+    function calculateWater() {
+      const showerMin = parseFloat(document.getElementById('in-shower-min').value) || 0;
+      const showerFlow = parseFloat(document.getElementById('coef-shower-flow').value) || 9;
+      const bathWeek = parseFloat(document.getElementById('in-bath-week').value) || 0;
+      const handwashTimes = parseFloat(document.getElementById('in-handwash').value) || 0;
+      const teethOpen = document.getElementById('in-teeth-open').checked;
+
+      document.getElementById('val-shower-min').textContent = showerMin;
+
+      const showerDaily = showerMin * showerFlow;
+      const bathDaily = (bathWeek * 140) / 7;
+      const handwashDaily = handwashTimes * 1.5;
+      const teethDaily = teethOpen ? 12 : 1.5;
+      const hygieneTotal = showerDaily + bathDaily + handwashDaily + teethDaily;
+
+      const dishMethod = document.querySelector('input[name="dish-method"]:checked').value;
+      const dishMin = parseFloat(document.getElementById('in-dish-min').value) || 0;
+      const dishwasherWeek = parseFloat(document.getElementById('in-dishwasher-week').value) || 0;
+      const vegLiters = parseFloat(document.getElementById('in-veg-liters').value) || 0;
+
+      document.getElementById('val-dish-min').textContent = dishMin;
+      document.getElementById('val-veg-liters').textContent = vegLiters;
+
+      const dishDaily = dishMethod === 'hand' ? (dishMin * 6) : ((dishwasherWeek * 12) / 7);
+      const kitchenTotal = dishDaily + vegLiters;
+
+      const laundryWeek = parseFloat(document.getElementById('in-laundry-week').value) || 0;
+      const laundryCoef = parseFloat(document.getElementById('coef-laundry-liters').value) || 50;
+      const toiletDay = parseFloat(document.getElementById('in-toilet-day').value) || 0;
+      const toiletCoef = parseFloat(document.getElementById('coef-toilet-liters').value) || 6;
+      const cleaningLiters = parseFloat(document.getElementById('in-cleaning-liters').value) || 0;
+
+      document.getElementById('val-cleaning-liters').textContent = cleaningLiters;
+
+      const laundryDaily = (laundryWeek * laundryCoef) / 7;
+      const toiletDaily = toiletDay * toiletCoef;
+      const houseTotal = laundryDaily + toiletDaily + cleaningLiters;
+
+      const dailyTotal = Math.round(hygieneTotal + kitchenTotal + houseTotal);
+      const weeklyTotal = Math.round(dailyTotal * 7);
+      const monthlyTotal = Math.round(dailyTotal * 30);
+
+      document.getElementById('cat-hygiene-total').textContent = `${Math.round(hygieneTotal)} л/күн`;
+      document.getElementById('cat-kitchen-total').textContent = `${Math.round(kitchenTotal)} л/күн`;
+      document.getElementById('cat-house-total').textContent = `${Math.round(houseTotal)} л/күн`;
+
+      document.getElementById('res-daily').textContent = dailyTotal.toLocaleString('ru-RU');
+      document.getElementById('res-weekly').textContent = `${weeklyTotal.toLocaleString('ru-RU')} л`;
+      document.getElementById('res-monthly').textContent = `${monthlyTotal.toLocaleString('ru-RU')} л`;
+
+      const activities = [
+        { name: 'Душ және ванна', val: showerDaily + bathDaily },
+        { name: 'Дәретхана', val: toiletDaily },
+        { name: 'Ыдыс жуу', val: kitchenTotal },
+        { name: 'Кір жуу', val: laundryDaily },
+        { name: 'Қол және тіс жуу', val: handwashDaily + teethDaily },
+        { name: 'Үй жинау', val: cleaningLiters }
+      ].sort((a, b) => b.val - a.val);
+
+      document.getElementById('res-top-activity').textContent = `${activities[0].name} (~${Math.round(activities[0].val)} л)`;
+
+      const tierBox = document.getElementById('res-tier-box');
+      const tierTitle = document.getElementById('res-tier-title');
+      const tierDesc = document.getElementById('res-tier-desc');
+
+      if (dailyTotal <= 115) {
+        tierBox.className = 'p-4 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900';
+        tierTitle.innerHTML = '🌿 «Сіз суды үнемді пайдаланасыз!»';
+        tierDesc.textContent = 'Көрсеткішіңіз орташа деңгейден төмен және БҰҰ бағдарына жақын.';
+      } else if (dailyTotal <= 165) {
+        tierBox.className = 'p-4 rounded-xl border border-sky-200 bg-sky-50 text-sky-900';
+        tierTitle.innerHTML = '💧 «Су тұтынуыңыз орташа деңгейде»';
+        tierDesc.textContent = `Шығыныңыз қазақстандық орташа қалалық көрсеткішке (~145 л) сай келеді.`;
+      } else {
+        tierBox.className = 'p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900';
+        tierTitle.innerHTML = '⚠️ «Су тұтынуыңызды азайтуға болады»';
+        tierDesc.textContent = 'Тұтыну орташа деңгейден жоғары. Душ уақытын қысқартуға кеңес беріледі.';
+      }
+
+      const chartData = [Math.round(hygieneTotal), Math.round(kitchenTotal), Math.round(houseTotal)];
+      if (calcChart) {
+        calcChart.data.datasets[0].data = chartData;
+        calcChart.update();
+      } else {
+        const ctx = document.getElementById('calcDoughnutChart').getContext('2d');
+        calcChart = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Жеке гигиена', 'Ас үй', 'Тұрмыстық'],
+            datasets: [{
+              data: chartData,
+              backgroundColor: ['#0284C7', '#10B981', '#6366F1'],
+              borderWidth: 2,
+              borderColor: '#FFFFFF'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: { legend: { position: 'right', labels: { font: { family: 'Inter', size: 11 }, boxWidth: 12 } } }
+          }
+        });
+      }
+    }
+
+    function resetCalculator() {
+      document.getElementById('in-shower-min').value = 7;
+      document.getElementById('coef-shower-flow').value = 9;
+      document.getElementById('in-bath-week').value = 0;
+      document.getElementById('in-handwash').value = 6;
+      document.getElementById('in-teeth-open').checked = false;
+      document.querySelector('input[name="dish-method"][value="hand"]').checked = true;
+      toggleDishMethod();
+      document.getElementById('in-dish-min').value = 5;
+      document.getElementById('in-veg-liters').value = 8;
+      document.getElementById('in-laundry-week').value = 3;
+      document.getElementById('coef-laundry-liters').value = 50;
+      document.getElementById('in-toilet-day').value = 5;
+      document.getElementById('coef-toilet-liters').value = 6;
+      document.getElementById('in-cleaning-liters').value = 10;
+      calculateWater();
+    }
+
+    // 4. TIPS & ECO CHALLENGE
+    const SAVING_TIPS = [
+      {
+        title: 'Тіс тазалағанда кранды жауып қойыңыз',
+        saving: 'Үнем: күніне 10–12 литр',
+        icon: 'sparkles',
+        short: 'Ашық тұрған краннан минутына 6 литрге дейін таза су босқа ағады.',
+        detail: 'Тіс тазалау барысында кранды жабу арқылы айына 1 400 литрге дейін су үнемдеуге болады.',
+        steps: ['Щетканы сулап болған соң кранды бірден жабыңыз.', 'Ауыз шаю үшін стақан пайдаланыңыз.']
+      },
+      {
+        title: 'Душ қабылдау уақытын қысқартыңыз',
+        saving: 'Үнем: күніне 18–25 литр',
+        icon: 'timer',
+        short: 'Душ уақытын небәрі 2 минутқа қысқарту айтарлықтай су сақтайды.',
+        detail: 'Қалыпты душ минутына 9–12 литр су өткізеді.',
+        steps: ['Сабындану кезінде суды уақытша тоқтатыңыз.', 'Үнемді аэратор қондырғысын орнатыңыз.']
+      },
+      {
+        title: 'Тамшылап тұрған крандарды жөндеңіз',
+        saving: 'Үнем: айына 400–600 литр',
+        icon: 'wrench',
+        short: 'Секундына 1 тамшы ағатын кран тәулігіне 20 литр су жоғалтады.',
+        detail: 'Ақаулы төсемелер жыл сайын мыңдаған литр судың ысырап болуына әкеледі.',
+        steps: ['Барлық крандар мен бачоктың ақауын тексеріңіз.', 'Тозған бөлшектерді дер кезінде ауыстырыңыз.']
+      },
+      {
+        title: 'Кір жуғыш машинаны толық жүктемемен қосыңыз',
+        saving: 'Үнем: аптасына 50–100 литр',
+        icon: 'refresh-cw',
+        short: 'Жартылай толтырылған машина толық циклдегідей су жұмсайды.',
+        detail: 'Киімді жинап, барабанды толық толтырып жуу әлдеқайда тиімді.',
+        steps: ['Барабанды 80-90% толтырып қосыңыз.', 'Eco режимін пайдаланыңыз.']
+      },
+      {
+        title: 'Ыдыс жуған кезде суды үздіксіз ағызбаңыз',
+        saving: 'Үнем: күніне 20–30 литр',
+        icon: 'utensils-crossed',
+        short: 'Ыдысты сабындау кезінде кранды жабу су шығынын азайтады.',
+        detail: 'Ағынды су астында ыдыс жуу көп мөлшерде таза суды кәрізге ағызады.',
+        steps: ['Барлық ыдысты көбіктендіріп болған соң бірге шайыңыз.']
+      },
+      {
+        title: 'Өсімдіктерді таңертең немесе кешке суарыңыз',
+        saving: 'Үнем: 30–40% суару суы',
+        icon: 'flower-2',
+        short: 'Күн ыстықта суару кезінде су тамырға жетпей буланып кетеді.',
+        detail: 'Таңертең ерте немесе кешке суару топырақ ылғалдылығын сақтайды.',
+        steps: ['Суаруды тек кешкі не таңғы уақытта жүргізіңіз.']
+      }
+    ];
+
+    const ECO_TASKS = [
+      { id: 'task1', text: 'Бүгін тіс тазалағанда кранды жаптым', points: 20, liters: 11 },
+      { id: 'task2', text: 'Душ қабылдау уақытын қысқарттым', points: 25, liters: 20 },
+      { id: 'task3', text: 'Крандардың ақауын тексердім / жөндедім', points: 20, liters: 15 },
+      { id: 'task4', text: 'Кір жуғыш машинаны толық жүктемемен қостым', points: 15, liters: 25 },
+      { id: 'task5', text: 'Ыдыс жуғанда суды босқа ағызбадым', points: 20, liters: 22 }
+    ];
+
+    function renderTipsAndEcoChallenge() {
+      const tipsGrid = document.getElementById('tips-grid');
+      tipsGrid.innerHTML = SAVING_TIPS.map((tip, idx) => `
+        <div onclick="openTipModal(${idx})" class="group cursor-pointer rounded-2xl p-6 border border-slate-200 hover:border-[#0284C7] bg-[#F4F8FB] hover:bg-white transition-all shadow-xs hover:shadow-card flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="w-11 h-11 rounded-xl bg-white border border-slate-200 text-[#0284C7] group-hover:bg-[#0284C7] group-hover:text-white flex items-center justify-center transition-colors">
+                <i data-lucide="${tip.icon}" class="w-5 h-5"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">${tip.saving}</span>
+            </div>
+            <h3 class="font-display font-bold text-base text-[#0A2540] group-hover:text-[#0284C7] transition-colors">${idx + 1}. ${tip.title}</h3>
+            <p class="text-xs text-slate-600 mt-2 leading-relaxed">${tip.short}</p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs font-semibold text-[#0284C7]">
+            <span>Толығырақ көру</span>
+            <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+          </div>
+        </div>
+      `).join('');
+
+      let savedTasks = [];
+      try { savedTasks = JSON.parse(localStorage.getItem('aquakz_eco_tasks') || '[]'); } catch (e) {}
+
+      const checklistEl = document.getElementById('eco-checklist');
+      checklistEl.innerHTML = ECO_TASKS.map(t => {
+        const checked = savedTasks.includes(t.id);
+        return `
+          <label class="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 cursor-pointer transition-colors">
+            <div class="flex items-center gap-3">
+              <input type="checkbox" value="${t.id}" ${checked ? 'checked' : ''} onchange="updateEcoTracker()" class="eco-task-cb w-5 h-5 rounded accent-emerald-400 cursor-pointer">
+              <span class="text-xs sm:text-sm font-medium text-white">${t.text}</span>
+            </div>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-400/20 text-emerald-200 shrink-0">+${t.points} ұпай</span>
+          </label>
+        `;
+      }).join('');
+
+      updateEcoTracker();
+    }
+
+    function updateEcoTracker() {
+      const checkedBoxes = Array.from(document.querySelectorAll('.eco-task-cb:checked')).map(cb => cb.value);
+      let points = 0;
+      let liters = 0;
+
+      checkedBoxes.forEach(id => {
+        const task = ECO_TASKS.find(t => t.id === id);
+        if (task) { points += task.points; liters += task.liters; }
+      });
+
+      document.getElementById('eco-points').textContent = points;
+      document.getElementById('eco-liters-saved').textContent = `${liters} л`;
+      document.getElementById('eco-percent-label').textContent = `${points}%`;
+      document.getElementById('eco-progress-bar').style.width = `${points}%`;
+
+      let rank = 'Бастаушы бақылаушы';
+      if (points >= 80) rank = 'Эко-көшбасшы';
+      else if (points >= 40) rank = 'Су сақшысы';
+      else if (points > 0) rank = 'Жауапты тұтынушы';
+
+      document.getElementById('eco-rank-label').textContent = `Мәртебе: ${rank}`;
+
+      try { localStorage.setItem('aquakz_eco_tasks', JSON.stringify(checkedBoxes)); } catch (e) {}
+    }
+
+    function openTipModal(idx) {
+      const tip = SAVING_TIPS[idx];
+      document.getElementById('tip-modal-title').textContent = tip.title;
+      document.getElementById('tip-modal-saving').textContent = tip.saving;
+      document.getElementById('tip-modal-body').textContent = tip.detail;
+      document.getElementById('tip-modal-steps').innerHTML = tip.steps.map(s => `<li>${s}</li>`).join('');
+      const modal = document.getElementById('tip-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeTipModal() {
+      const modal = document.getElementById('tip-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // 5. NEWS & ISSUES
+    const NEWS_ITEMS = [
+      {
+        category: 'aral-balkhash',
+        tag: 'Арал теңізі',
+        date: '2024 ж.',
+        title: 'Солтүстік Арал теңізіндегі су көлемі тұрақталды',
+        summary: 'ҚР Су ресурстары және ирригация министрлігінің мәліметінше, Сырдария өзені арқылы су жіберуді реттеу нәтижесінде Солтүстік Аралдың деңгейі сақталуда.',
+        source: 'ҚР СРИМ',
+        url: 'https://www.gov.kz/memleket/entities/water?lang=kk'
+      },
+      {
+        category: 'aral-balkhash',
+        tag: 'Балқаш көлі',
+        date: '2024 ж.',
+        title: 'Балқаш көлінің экожүйесін сақтау шаралары',
+        summary: 'Қазгидромет мамандары Балқаш көлінің деңгейін тұрақты бақылауда ұстауда. Іле өзенінің ағысы мен су режимі басты назарда.',
+        source: 'Қазгидромет',
+        url: 'https://www.kazhydromet.kz/'
+      },
+      {
+        category: 'infrastructure',
+        tag: 'Су үнемдеу технологиялары',
+        date: '2024 ж.',
+        title: 'Ауыл шаруашылығында су үнемдеу субсидиялары артты',
+        summary: 'Тамшылатып суару жүйелерін орнататын шаруаларға шығындарды өтеу үлесі 80%-ға дейін ұлғайтылды.',
+        source: 'ҚР СРИМ',
+        url: 'https://www.gov.kz/memleket/entities/water?lang=kk'
+      },
+      {
+        category: 'rivers',
+        tag: 'Трансшекаралық өзендер',
+        date: '2024 ж.',
+        title: 'Жайық және Ертіс өзендері бойынша бірлескен мониторинг',
+        summary: 'Трансшекаралық өзендер бассейндерінде су тасқыны мен тартылу кезеңдерін болжау үшін автоматтандырылған бекеттер жұмыс істейді.',
+        source: 'Қазгидромет',
+        url: 'https://www.kazhydromet.kz/'
+      },
+      {
+        category: 'infrastructure',
+        tag: 'Су инфрақұрылымы',
+        date: '2024 ж.',
+        title: 'Су шаруашылығын дамытудың кешенді жоспары',
+        summary: 'Жоспар аясында жаңа су қоймаларын салу және ирригациялық арналарды цифрландыру көзделген.',
+        source: 'ҚР Үкіметі',
+        url: 'https://www.gov.kz/memleket/entities/water?lang=kk'
+      },
+      {
+        category: 'rivers',
+        tag: 'Климат және су тапшылығы',
+        date: '2024 ж.',
+        title: 'Орталық Азиядағы су балансы және мұздықтар',
+        summary: 'UN-Water есебіне сәйкес, климаттың өзгеруі жағдайында суды үнемді пайдалану ең басты міндет болып табылады.',
+        source: 'UN-Water',
+        url: 'https://www.unwater.org/'
+      }
+    ];
+
+    function renderNews(filter = 'all') {
+      const grid = document.getElementById('news-grid');
+      const filtered = filter === 'all' ? NEWS_ITEMS : NEWS_ITEMS.filter(n => n.category === filter);
+
+      grid.innerHTML = filtered.map(item => `
+        <article class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-soft hover:shadow-card transition-all flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-sky-50 text-[#0284C7]">${item.tag}</span>
+              <span class="text-xs text-slate-400">${item.date}</span>
+            </div>
+            <h3 class="font-display font-bold text-base text-[#0A2540] leading-snug mb-2.5">${item.title}</h3>
+            <p class="text-xs text-slate-600 leading-relaxed">${item.summary}</p>
+          </div>
+          <div class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span class="text-slate-400 truncate max-w-[180px]">${item.source}</span>
+            <a href="${item.url}" target="_blank" rel="noopener" class="text-[#0284C7] font-semibold hover:underline flex items-center gap-1 shrink-0">
+              Дереккөз <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+            </a>
+          </div>
+        </article>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function filterNews(cat) {
+      document.querySelectorAll('.news-filter-btn').forEach(btn => {
+        if (btn.dataset.filter === cat) {
+          btn.classList.remove('bg-white', 'text-slate-700', 'border', 'border-slate-200');
+          btn.classList.add('bg-[#0A2540]', 'text-white');
+        } else {
+          btn.classList.add('bg-white', 'text-slate-700', 'border', 'border-slate-200');
+          btn.classList.remove('bg-[#0A2540]', 'text-white');
+        }
+      });
+      renderNews(cat);
+    }
+
+    // 6. GLOBAL SEARCH
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobile-menu');
+      menu.classList.toggle('hidden');
+    }
+
+    function openSearchModal() {
+      const modal = document.getElementById('search-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      const input = document.getElementById('global-search-input');
+      input.value = '';
+      input.focus();
+      handleGlobalSearch('');
+    }
+
+    function closeSearchModal() {
+      const modal = document.getElementById('search-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function handleGlobalSearch(query) {
+      const q = query.trim().toLowerCase();
+      const resultsEl = document.getElementById('search-results-list');
+
+      const cityMatches = CITIES_DATA.filter(c => c.name.toLowerCase().includes(q) || c.region.toLowerCase().includes(q)).slice(0, 5);
+      const sectionLinks = [
+        { title: 'Қазақстанның су картасы', href: '#map-section', sub: '20 қала мониторингі' },
+        { title: 'Су тұтыну калькуляторы', href: '#calculator', sub: 'Тәуліктік литрді есептеу' },
+        { title: 'Су статистикасы', href: '#statistics', sub: 'Ресми графиктер' },
+        { title: 'Жоба туралы және Автор', href: '#about-project', sub: 'Ханабек Зере Қанатқызы (ҚазҰҚПУ)' }
+      ].filter(s => !q || s.title.toLowerCase().includes(q));
+
+      let html = '';
+      if (cityMatches.length > 0) {
+        html += `<p class="px-3 py-1 text-[10px] font-bold uppercase text-slate-400">Қалалар</p>`;
+        html += cityMatches.map(c => `
+          <button onclick="selectCityFromSearch('${c.id}')" class="w-full text-left px-3 py-2 rounded-xl hover:bg-sky-50 flex items-center justify-between">
+            <span class="text-sm font-bold text-[#0A2540]">${c.name}</span>
+            <span class="text-xs text-[#0284C7]">Картада көру →</span>
+          </button>
+        `).join('');
+      }
+
+      html += `<p class="px-3 py-1 mt-2 text-[10px] font-bold uppercase text-slate-400">Бөлімдер</p>`;
+      html += sectionLinks.map(s => `
+        <a href="${s.href}" onclick="closeSearchModal()" class="block px-3 py-2 rounded-xl hover:bg-slate-50">
+          <p class="text-sm font-semibold text-slate-800">${s.title}</p>
+        </a>
+      `).join('');
+
+      resultsEl.innerHTML = html;
+    }
+
+    function selectCityFromSearch(cityId) {
+      closeSearchModal();
+      document.getElementById('map-section').scrollIntoView({ behavior: 'smooth' });
+      setTimeout(() => selectCityFromDropdown(cityId), 400);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        openSearchModal();
+      }
+      if (e.key === 'Escape') {
+        closeSearchModal();
+        closeTipModal();
+      }
+    });
+
+    // BOOTSTRAP
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      initMap();
+      initStatisticsCharts();
+      calculateWater();
+      renderTipsAndEcoChallenge();
+      renderNews('all');
+
+      setTimeout(() => {
+        const loader = document.getElementById('app-loader');
+        loader.style.opacity = '0';
+        setTimeout(() => loader.remove(), 500);
+      }, 400);
+    });
+  </script>
+</body>
+</html>
